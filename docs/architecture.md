@@ -242,3 +242,92 @@ These are intentionally deferred until the core monitoring application is functi
 - Should on-demand checks be persisted?
 - What level of concurrency should the monitoring worker support?
 - How should endpoint degradation be distinguished from outright failure?
+
+
+## Milestone 1 Implementation Decisions
+The following decisions clarify the initial stateless monitoring API implementation.
+
+### Scope
+- Implement the Node.js/Express/TypeScript API.
+- Implement a reusable HTTP checking function.
+- Include unit tests for the checking function and integration tests for the API route.
+- Provide a Dockerfile for local containerized execution.
+- Defer Docker Compose, GitHub Actions, the mock API, database persistence, scheduling, and frontend development.
+- Monitor configuration and management endpoints are excluded from this milestone.
+
+### API Contract
+`GET /health`
+Returns HTTP 200 with basic application health information.
+
+`POST /api/checks`
+Executes an on-demand check against one predefined target.
+
+No request body is required.
+
+A completed check returns HTTP 200, even when the monitored endpoint is unhealthy.
+
+Example check result:
+```
+{
+  "target": "Example Service",
+  "status": "healthy",
+  "statusCode": 200,
+  "responseTimeMs": 142,
+  "checkedAt": "2026-10-15T19:00:00.000Z",
+  "error": null
+}
+```
+
+Possible status values:
+- `healthy`
+- `http_error`
+- `timeout`
+- `connection_error`
+
+`statusCode` is null when no HTTP response is received.
+
+`error` is null for completed HTTP responses and contains a sanitized message for network failures or timeouts.
+
+Unexpected application errors return HTTP 500 with a generic JSON error response.
+
+### Configuration
+The monitored target is configured through environment variables.
+
+Initial settings:
+- Target display name.
+- Target URL.
+- Request timeout, defaulting to 5,000 milliseconds.
+
+The URL must use the HTTP or HTTPS scheme.
+
+Required configuration is validated at application startup. Invalid configuration prevents startup with a clear diagnostic message.
+
+No user-supplied monitoring URLs are accepted through the API.
+
+### HTTP Check Semantics
+- `checkedAt` records the UTC time when the check begins.
+- `responseTimeMs` measures elapsed time until response headers are received or the request fails.
+- HTTP status codes 200–299 are considered healthy.
+- Other HTTP responses are categorized as `http_error`.
+- Redirects are not followed (`redirect: "manual"`).
+- Requests use a configurable timeout.
+- Response bodies are not required for health evaluation.
+
+### Testing
+Unit tests use an injected or mocked HTTP client and do not depend on external network services.
+
+API integration tests verify route behavior and response structure without requiring public APIs.
+
+Tests must cover successful responses, HTTP errors, timeouts, and connection failures.
+
+### Deployment and Security
+Milestone 1 is intended for local/private development only.
+
+The API must not be publicly exposed without additional access controls and network security protections.
+
+Only explicitly configured targets are checked.
+
+### Dependencies
+The technologies explicitly listed in the architecture are approved for installation, including required development tooling and TypeScript type definitions.
+
+Additional libraries or frameworks require approval before installation.
