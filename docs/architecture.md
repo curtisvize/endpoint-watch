@@ -259,7 +259,7 @@ The following decisions clarify the initial stateless monitoring API implementat
 `GET /health`
 Returns HTTP 200 with basic application health information.
 
-`POST /api/checks`
+`POST /api/checks/run`
 Executes an on-demand check against one predefined target.
 
 No request body is required.
