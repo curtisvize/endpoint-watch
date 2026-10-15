@@ -51,7 +51,7 @@ The application shall:
 - Apply a configurable request timeout.
 - Distinguish successful responses, HTTP errors, timeouts, and connection failures.
 
-For the MVP, HTTP status codes 200-299 are considered successful. Other responses are considered failed checks.
+For the MVP, HTTP 2xx status codes are considered successful. Other responses are considered failed checks.
 
 ### 4.3 Monitoring History
 The application shall:
@@ -103,7 +103,7 @@ The initial implementation will not require user accounts or role-based access c
 - Configuration should be separated from application code.
 
 ### Testing
-- Automated test shall cover successful checks, HTTP errors, timeouts, and connection failures.
+- Automated tests shall cover successful checks, HTTP errors, timeouts, and connection failures.
 - API behavior shall be covered by integration tests.
 - Core dashboard workflows shall be covered by end-to-end tests.
 

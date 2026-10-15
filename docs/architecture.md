@@ -61,7 +61,8 @@ The worker and API share monitoring and database modules but execute as separate
 ### 3.4 PostgreSQL Database
 PostgreSQL stores monitor configuration and historical check results.
 
-The initial data model consists of two tables:
+The initial data model consists of two tables:  
+
 **monitors**
 - id
 - name
@@ -86,7 +87,7 @@ Indexes will support efficient retrieval of recent results by monitor and timest
 ### 3.5 Mock API
 A separate mock HTTP service will provide predictable test scenarios, including successful responses, HTTP errors, delays, and intermittent failures.
 
-The mock API is a development and testing dependency, not part of the productio monitoring application.
+The mock API is a development and testing dependency, not part of the production monitoring application.
 
 ## 4. Monitoring Workflow
 For scheduled monitoring:
@@ -166,7 +167,7 @@ Test monitoring logic independently from the HTTP server and database.
 
 Cover:
 - Successful HTTP responses.
-- Non-2cc responses.
+- Non-2xx responses.
 - Request timeouts.
 - Network failures.
 - Response-time measurement.
