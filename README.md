@@ -67,3 +67,9 @@ curl -i -X POST http://127.0.0.1:3000/api/checks/run
 Both should return HTTP 200. Health returns `{"status":"ok"}` and the check
 returns a structured result with `status: "healthy"` and `statusCode: 200`.
 Stop the container with `docker stop endpoint-watch-api`.
+
+## Database schema (Milestone 2)
+
+See [database migrations](db/README.md) for local PostgreSQL setup, migration
+commands, schema choices, and SQL verification. Migrations run separately; the
+API remains stateless at this step.
