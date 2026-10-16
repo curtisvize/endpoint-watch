@@ -1,9 +1,10 @@
 import { once } from 'node:events';
 import { get } from 'node:http';
 import { expect, it } from 'vitest';
-import { app } from '../src/app.js';
+import { createApp } from '../src/app.js';
 
 it('GET /health returns HTTP 200 and an ok status', async () => {
+  const app = createApp({ name: 'Test', url: 'https://example.test', timeoutMs: 5000 });
   const server = app.listen(0, '127.0.0.1');
 
   try {
