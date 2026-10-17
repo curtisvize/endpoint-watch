@@ -54,3 +54,58 @@ rollback commands or checksum tracking. Nontransactional operations such as
   id DESC LIMIT ...`, including a deterministic tie-breaker and foreign-key lookups.
 - No timeout column, seed targets, scheduling state, or retention policy is added;
   those are outside the documented initial table definitions and this task.
+
+## TypeScript access layer
+
+`apps/api/src/database/pool.ts` exports `createDatabasePool(config?)`. It accepts
+`pg`'s `PoolConfig` overrides and otherwise uses standard PostgreSQL environment
+settings (`PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`). There is no
+automatic `DATABASE_URL` loading; pass a connection URL explicitly using
+`{ connectionString: ... }` when needed. Keep credentials outside source control.
+TLS can be configured through `PoolConfig.ssl`; verification is not disabled by
+this layer.
+
+Pool defaults are 10 connections, a 5-second connection-acquisition timeout, and
+a 30-second idle timeout. Creation is lazy; importing the module opens no
+connections. Owners must call `pool.end()` during shutdown. Idle connection
+errors produce a generic diagnostic without connection details.
+
+`repository.ts` provides these functions, taking a pool or a transaction's
+`PoolClient` as their first argument:
+
+- `listEnabledMonitors(db)` returns enabled monitors ordered by ID.
+- `getMonitorById(db, id)` returns a monitor (including disabled monitors) or null.
+- `insertCheckResult(db, input)` returns the inserted record. Input uses the
+  schema's field names, including `monitor_id`, `outcome`, and `error_message`.
+- `getRecentResultsForMonitor(db, monitorId, limit?)` returns newest-first results,
+  breaking timestamp ties by descending ID. The default limit is 20; accepted
+  limits are integers from 1 through 1000. Missing monitors/history return `[]`.
+
+Record types are in `records.ts`: bigint IDs are strings, timestamps are `Date`
+objects, and nullable columns remain null. Queries parameterize all supplied
+values. Database failures reject the returned promise with the original `pg`
+error for callers to handle; callers must sanitize errors before logging or
+returning them over HTTP. Diagnostic text supplied for insertion must already
+be sanitized.
+
+No pool is created by the API startup, and the Milestone 1 on-demand route still
+uses its environment-configured target without reading or writing PostgreSQL.
+
+## Repository tests
+
+From `apps/api`, `npm test` runs database-free checks and existing API tests.
+Repository integration tests are skipped unless `TEST_DATABASE_URL` is set.
+To execute them, migrate a **dedicated test database** first, then run:
+
+```bash
+TEST_DATABASE_URL=postgresql://localhost/endpoint_watch_test npm test
+```
+
+Supply the correct connection settings for your local test installation. The
+tests require PostgreSQL and the migrated tables; they do not create a database
+or migrate it automatically. They insert fixtures, temporarily disable existing
+monitors, and take table locks inside transactions that are rolled back after
+each test. Identity sequences may advance. Do not run against a production or
+shared development database. Tests cover filtering, missing records, all check
+outcomes, date/bigint decoding, fractional durations, ordering and limits,
+parameterized inputs, and PostgreSQL constraint errors.
