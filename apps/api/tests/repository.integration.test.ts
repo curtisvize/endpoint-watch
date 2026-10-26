@@ -1,7 +1,7 @@
 import type { Pool, PoolClient } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDatabasePool } from '../src/database/pool.js';
-import { getMonitorById, getRecentResultsForMonitor, insertCheckResult, listEnabledMonitors } from '../src/database/repository.js';
+import { getMonitorById, getRecentResultsForMonitor, insertCheckResult, listEnabledMonitors, listMonitors } from '../src/database/repository.js';
 import type { MonitorRecord, NewCheckResult } from '../src/database/records.js';
 
 const connectionString = process.env.TEST_DATABASE_URL;
@@ -48,6 +48,7 @@ describe.skipIf(!connectionString)('PostgreSQL repositories (requires migrated T
 
   it('lists enabled monitors and retrieves either enabled or disabled monitors by ID', async () => {
     expect(await listEnabledMonitors(client)).toEqual([first]);
+    expect(await listMonitors(client)).toEqual(expect.arrayContaining([first, second]));
     expect(await getMonitorById(client, second.id)).toEqual(second);
     expect(typeof first.id).toBe('string');
     expect(first.created_at).toBeInstanceOf(Date);

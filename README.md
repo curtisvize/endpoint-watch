@@ -72,7 +72,39 @@ Stop the container with `docker stop endpoint-watch-api`.
 
 See [database migrations](db/README.md) for local PostgreSQL setup, migration
 commands, schema choices, and SQL verification. Migrations run separately; the
-API remains stateless at this step.
+API reads stored monitoring data; the worker writes scheduled results.
+
+## Read-only monitoring API
+
+The API uses standard PostgreSQL connection environment settings as described in
+[database access configuration](db/README.md). Migrate the database before using
+these endpoints. Continue supplying `MONITOR_NAME` and `MONITOR_URL` for the
+existing on-demand check. In Docker, supply database settings at runtime with
+`-e` or `--env-file`; `PGHOST` must be reachable from inside the container.
+
+| Endpoint | HTTP 200 response |
+| --- | --- |
+| `GET /api/monitors` | `{ "data": [monitor, ...] }`, including disabled monitors |
+| `GET /api/monitors/:id` | `{ "data": monitor }` |
+| `GET /api/monitors/:id/checks?limit=20` | `{ "data": [check, ...] }`, newest first |
+
+Monitor fields are `id`, `name`, `intervalSeconds`, `enabled`, and `createdAt`.
+Target URLs are intentionally omitted to avoid exposing credentials or query
+secrets. Check fields are `id`, `monitorId`, `checkedAt`, `outcome`, `statusCode`,
+`responseTimeMs`, and `error`. IDs are strings and timestamps are ISO UTC strings.
+Stored diagnostics must already be sanitized by the writer.
+
+IDs must be canonical positive decimal PostgreSQL bigint values (at most
+`9223372036854775807`). History limits must be positive decimal integers from
+1 through 1000, defaulting to 20; empty, repeated, fractional, and out-of-range
+limits return HTTP 400. History is ordered by `checkedAt` descending, then ID
+descending when timestamps tie. An existing monitor without checks returns an
+empty array. Unknown monitors return HTTP 404. Invalid IDs return HTTP 400 and
+unexpected failures return HTTP 500. Errors use `{ "error": "message" }`, with
+generic messages for server errors.
+
+`GET /health` and `POST /api/checks/run` retain their original response formats
+and do not require a database connection. No monitor write endpoints are exposed.
 
 ## Scheduled monitoring worker
 
