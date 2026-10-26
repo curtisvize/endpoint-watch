@@ -7,6 +7,11 @@ export type Database = Pick<Pool, 'query'>;
 const monitorColumns = 'id, name, url, interval_seconds, enabled, created_at';
 const resultColumns = 'id, monitor_id, checked_at, outcome, status_code, response_time_ms, error_message';
 
+export async function listMonitors(db: Database): Promise<MonitorRecord[]> {
+  const result = await db.query<MonitorRecord>(`SELECT ${monitorColumns} FROM monitors ORDER BY id`);
+  return result.rows;
+}
+
 export async function listEnabledMonitors(db: Database): Promise<MonitorRecord[]> {
   const result = await db.query<MonitorRecord>(
     `SELECT ${monitorColumns} FROM monitors WHERE enabled = true ORDER BY id`,

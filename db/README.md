@@ -1,7 +1,7 @@
 # Database migrations
 
 These scripts use PostgreSQL and `psql` (tested with PostgreSQL 17). They are
-separate from API startup; the API does not connect to the database yet.
+separate from API startup. The API reads monitoring data from the migrated database.
 
 Create an empty local database with `createdb endpoint_watch`, then run from the
 repository root:
@@ -74,6 +74,8 @@ errors produce a generic diagnostic without connection details.
 `PoolClient` as their first argument:
 
 - `listEnabledMonitors(db)` returns enabled monitors ordered by ID.
+- `listMonitors(db)` returns all configured monitors, including disabled monitors,
+  ordered by ID.
 - `getMonitorById(db, id)` returns a monitor (including disabled monitors) or null.
 - `insertCheckResult(db, input)` returns the inserted record. Input uses the
   schema's field names, including `monitor_id`, `outcome`, and `error_message`.
@@ -88,8 +90,10 @@ error for callers to handle; callers must sanitize errors before logging or
 returning them over HTTP. Diagnostic text supplied for insertion must already
 be sanitized.
 
-No pool is created by the API startup, and the Milestone 1 on-demand route still
-uses its environment-configured target without reading or writing PostgreSQL.
+API startup creates a lazy pool for read-only monitoring routes, with a five-second
+SQL statement timeout. SIGINT/SIGTERM stop accepting requests and close the pool
+after active requests finish. The Milestone 1 on-demand route still uses its
+environment-configured target without reading or writing PostgreSQL.
 
 ## Repository tests
 
