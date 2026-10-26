@@ -1,6 +1,82 @@
 # endpoint-watch
 A lightweight API health monitoring and incident tracking application
 
+## Docker Compose development environment
+
+From the repository root, copy `.env.example` to `.env` and set
+`POSTGRES_PASSWORD` to a local development password. `.env` is ignored by Git.
+Requires Docker with the Compose plugin.
+
+```bash
+cp .env.example .env
+# Edit .env and set POSTGRES_PASSWORD before continuing.
+docker compose up -d --build --wait
+docker compose ps -a
+docker compose logs -f api worker
+```
+
+Compose starts PostgreSQL, a one-shot migration service, a mock API, the Express
+API, and a separate monitoring worker. PostgreSQL health gates migrations;
+successful migrations and mock API health gate API/worker startup. Migration
+failure prevents dependent services from starting. The API health check exercises
+the database-backed monitor list; the worker check verifies process liveness,
+not successful polling or persistence. Check history and logs for worker progress.
+
+The migration job runs the existing tracked SQL migrations on every `up` and
+idempotently adds three development monitors if their name/URL pair is absent.
+These poll every 10 seconds: mock healthy (`/health`), HTTP 500 (`/error`), and
+delayed (`/delay`). Existing monitor settings are not reset. The mock delay
+defaults to 6000ms, exceeding the worker's default 5000ms timeout. Override
+`MOCK_DELAY_MS` or `MONITOR_TIMEOUT_MS` in `.env` as needed.
+
+Only the Express API is published, at `http://127.0.0.1:3000` (override `API_PORT`
+in `.env`). PostgreSQL and the mock API have no host port mappings. Containers
+use service DNS names `postgres` and `mock-api`, rather than host `localhost`.
+The mock has no configuration/control routes and is for development only.
+The API, worker, and mock share the compiled Node image with different commands.
+
+```bash
+curl http://127.0.0.1:3000/health
+curl -X POST http://127.0.0.1:3000/api/checks/run
+curl http://127.0.0.1:3000/api/monitors
+# Use an ID from the monitor list; allow at least 10 seconds for initial history.
+curl 'http://127.0.0.1:3000/api/monitors/1/checks?limit=5'
+```
+
+The on-demand route checks mock health without persisting; the worker writes
+scheduled results. To inspect SQL directly without a host PostgreSQL client:
+
+```bash
+docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+Stop, rebuild, or reset using:
+
+```bash
+docker compose stop                 # Stop containers; retain database data.
+docker compose up -d --build --wait # Start again and rebuild changed code.
+docker compose down                # Remove containers/network; retain named volume.
+docker compose down --volumes       # Delete this project's database data as well.
+docker compose up -d --build --wait # Recreate schema and development monitors.
+```
+
+PostgreSQL data lives in the project-scoped `postgres-data` named volume.
+Reset deletes all monitoring history. Database user/password/name settings apply
+when initializing an empty volume; changing `.env` does not change existing
+database credentials. Keep the original settings or reset the development data.
+For new SQL migrations while running, stop API/worker, run the migration job,
+then start again:
+
+```bash
+docker compose stop api worker
+docker compose run --rm migrate
+docker compose up -d --wait
+```
+
+Secrets are provided at runtime and are not built into images. This Compose file
+is for local development; its database owner account is shared by migrations and
+application services. It does not configure production database roles or hosting.
+
 ## Run the API locally
 
 Requires Node.js 20.19 or newer. From `apps/api`:

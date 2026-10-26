@@ -1,0 +1,91 @@
+x-node: &node
+  image: endpoint-watch-dev
+  build:
+    context: ./apps/api
+  init: true
+  stop_grace_period: 30s
+
+x-database-environment: &database-environment
+  PGHOST: postgres
+  PGPORT: "5432"
+  PGUSER: ${POSTGRES_USER:-endpoint_watch}
+  PGDATABASE: ${POSTGRES_DB:-endpoint_watch}
+  PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env file}
+
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-endpoint_watch}
+      POSTGRES_DB: ${POSTGRES_DB:-endpoint_watch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env file}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  migrate:
+    image: postgres:17-bookworm
+    environment: *database-environment
+    volumes:
+      - ./db:/work/db:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["sh", "-c", "psql -X -f /work/db/migrate.sql && psql -X -v ON_ERROR_STOP=1 -f /work/db/dev/seed.sql"]
+    restart: "no"
+
+  mock-api:
+    <<: *node
+    command: ["node", "dist/mock-api.js"]
+    environment:
+      MOCK_DELAY_MS: ${MOCK_DELAY_MS:-6000}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    <<: *node
+    environment:
+      <<: *database-environment
+      HOST: 0.0.0.0
+      MONITOR_NAME: Mock healthy
+      MONITOR_URL: http://mock-api:3000/health
+      MONITOR_TIMEOUT_MS: ${MONITOR_TIMEOUT_MS:-5000}
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mock-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/monitors').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 8s
+      retries: 10
+
+  worker:
+    <<: *node
+    command: ["node", "dist/worker.js"]
+    environment:
+      <<: *database-environment
+      MONITOR_TIMEOUT_MS: ${MONITOR_TIMEOUT_MS:-5000}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mock-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('node:fs'); const alive=fs.readdirSync('/proc').filter(n=>/^\\d+$/.test(n)).some(n=>{try{return fs.readFileSync('/proc/'+n+'/cmdline','utf8').split('\\0').includes('dist/worker.js')}catch{return false}});process.exit(alive?0:1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  postgres-data:
