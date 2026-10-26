@@ -1,6 +1,18 @@
 # endpoint-watch
 A lightweight API health monitoring and incident tracking application
 
+## Automated checks
+
+From `apps/api`, run `npm ci`, `npm test`, `npm run typecheck:tests`, and
+`npm run build`. Database integration tests require a dedicated PostgreSQL
+database, the `psql` client, and `TEST_DATABASE_URL`; see the
+[integration test instructions](db/README.md#postgresql-integration-tests).
+`npm run test:integration` explicitly requires database configuration.
+
+GitHub Actions runs on pull requests and pushes to `main`, using Node.js 24 and
+a disposable PostgreSQL 17 service to apply migrations, verify the schema, run
+all tests, type-check test code, and build. No deployment or release steps run.
+
 ## Docker Compose development environment
 
 From the repository root, copy `.env.example` to `.env` and set

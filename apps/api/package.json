@@ -13,6 +13,7 @@
     "dev:worker": "tsx watch src/worker.ts",
     "start:worker": "node dist/worker.js",
     "test": "vitest run",
+    "test:integration": "node scripts/run-integration-tests.mjs",
     "typecheck:tests": "tsc -p tests/tsconfig.json"
   },
   "dependencies": {
