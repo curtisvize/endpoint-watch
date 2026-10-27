@@ -84,6 +84,19 @@ For each implementation task:
 
 Do not claim that tests have passed unless they were actually executed successfully.
 
+
+## Manual Verification and Documentation
+
+For each new feature:
+
+- Provide a short set of commands or UI steps for manually verifying the feature.
+- Describe the expected output or observable behavior.
+- Distinguish between verification actually performed by the agent and verification the developer must perform locally.
+- Keep the root README's quick-start instructions accurate and concise.
+- Place detailed setup, troubleshooting, and advanced commands in the appropriate documentation rather than expanding the root README indefinitely.
+- Avoid introducing unnecessary setup steps or dependencies solely for testing.
+- Do not claim a feature is verified solely because automated tests pass; explain what the tests cover and what remains unverified.
+
 ## Human Review
 The project owner is responsible for architectural decisions, reviewing changes, and approving new dependencies.
 
