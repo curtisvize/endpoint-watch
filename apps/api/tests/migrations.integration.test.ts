@@ -19,22 +19,29 @@ describe.skipIf(!connectionString)('SQL migration execution against PostgreSQL',
   afterEach(async () => { await pool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`); });
   afterAll(async () => { await pool?.end(); });
 
-  function migrate() {
+  function migrate(databaseUrl = connectionString!) {
     // Optional executable override allows use of a local Docker psql wrapper.
-    const result = spawnSync(process.env.TEST_PSQL_BIN ?? 'psql', ['-X', '-f', migrationFile], {
-      env: { ...process.env, PGDATABASE: connectionString, PGOPTIONS: `-c search_path=${schema},public` },
+    const result = spawnSync(process.env.TEST_PSQL_BIN ?? 'psql', [
+      '-X', '--dbname', databaseUrl, '-v', 'VERBOSITY=sqlstate', '-f', migrationFile,
+    ], {
+      env: { ...process.env, PGOPTIONS: `-c search_path=${schema},public` },
       encoding: 'utf8', timeout: 15000,
     });
-    if (result.error) throw new Error('Cannot run psql; install the PostgreSQL client or set TEST_PSQL_BIN');
-    return result;
+    if (result.error) throw new Error('Unable to execute psql: check client installation and the 15-second timeout');
+    // Never expose raw stderr or spawn arguments: either may contain connection credentials.
+    const sqlState = result.stderr.match(/(?:ERROR|FATAL):\s+([0-9A-Z]{5})\b/)?.[1];
+    const diagnostic = `psql exit status: ${result.status ?? 'none'}; SQLSTATE: ${sqlState ?? 'unavailable'}`;
+    return { status: result.status, sqlState, diagnostic };
   }
 
   it('creates the schema and index, records the version, and safely skips applied migrations', async () => {
-    expect(migrate().status).toBe(0);
+    const initial = migrate();
+    expect(initial.status, initial.diagnostic).toBe(0);
     const inserted = await pool.query<{ id: string }>(
       `INSERT INTO ${schema}.monitors (name, url) VALUES ('Preserved', 'https://example.test') RETURNING id`,
     );
-    expect(migrate().status).toBe(0);
+    const repeated = migrate();
+    expect(repeated.status, repeated.diagnostic).toBe(0);
     expect((await pool.query(`SELECT * FROM ${schema}.schema_migrations`)).rows).toHaveLength(1);
     expect((await pool.query(`SELECT id FROM ${schema}.monitors`)).rows).toEqual(inserted.rows);
     const index = await pool.query('SELECT indexname FROM pg_indexes WHERE schemaname = $1 AND indexname = $2',
@@ -50,8 +57,20 @@ describe.skipIf(!connectionString)('SQL migration execution against PostgreSQL',
   it('rolls back created tables and migration tracking when a migration fails', async () => {
     // Force failure after monitors has been created, without changing migration files.
     await pool.query(`CREATE TABLE ${schema}.check_results (id integer)`);
-    expect(migrate().status).not.toBe(0);
+    const failed = migrate();
+    expect(failed.status, failed.diagnostic).toBe(3);
+    expect(failed.sqlState, failed.diagnostic).toBe('42P07');
     const tables = await pool.query('SELECT tablename FROM pg_tables WHERE schemaname = $1', [schema]);
     expect(tables.rows).toEqual([{ tablename: 'check_results' }]);
+  });
+
+  it('distinguishes connection failures from SQL failures without exposing the connection URL', () => {
+    const unavailable = new URL(connectionString!);
+    unavailable.pathname = `/missing_${randomUUID().replaceAll('-', '')}`;
+    const failed = migrate(unavailable.toString());
+    expect(failed.status, failed.diagnostic).toBe(2);
+    expect(failed.diagnostic).not.toContain(unavailable.toString());
+    expect(failed.diagnostic).not.toContain(unavailable.pathname.slice(1));
+    expect(failed.diagnostic).toMatch(/^psql exit status: 2; SQLSTATE: (unavailable|[0-9A-Z]{5})$/);
   });
 });

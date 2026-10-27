@@ -141,8 +141,9 @@ against the database being used by a running worker. The tests are isolated by
 transactions and unique schema names, and may be run repeatedly.
 
 `TEST_PSQL_BIN` optionally selects a different `psql` executable or wrapper. A
-wrapper must honor `PGDATABASE` (the connection URL), `PGOPTIONS` (the isolated
-schema search path), and the supplied arguments. If running `psql` inside a
+wrapper must forward all supplied arguments unchanged, including `--dbname`
+(the connection URL), and honor `PGOPTIONS` (the isolated schema search path).
+It must not replace connection arguments with hardcoded settings. If running `psql` inside a
 container, the repository's `db` directory must be readable at the same absolute
 path as on the test host, for `-f` and relative migration includes to resolve.
 
