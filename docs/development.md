@@ -1,9 +1,48 @@
 # Development guide
 
 All Docker/Compose commands below run from the repository root. Native npm
-commands run from `apps/api`. See the [quick start and smoke test](../README.md)
+commands run from `apps/api` unless the frontend section specifies `apps/web`.
+See the [quick start and smoke test](../README.md)
 for the shortest path, [API reference](api.md) for responses, and
 [troubleshooting](troubleshooting.md) for failures.
+
+## Run the frontend locally
+
+The initial React/Vite/TypeScript shell is in `apps/web`, with its own package
+and lockfile. Use Node.js 24 to match the project's development environment.
+From `apps/web`:
+
+```bash
+npm ci
+npm run dev
+```
+
+Open the local URL Vite prints (normally `http://127.0.0.1:5173`). Expect an
+Endpoint Watch heading and a placeholder for endpoint status and check history.
+This scaffold has no API calls or monitoring components, so neither PostgreSQL
+nor the backend/Compose stack needs to be running.
+
+Manual verification:
+
+1. Open the printed URL and confirm the heading and placeholder are visible.
+   This checks the browser entry point and React rendering.
+2. Resize the browser to a narrow mobile width (about 320px), then a desktop
+   width. Expect text to wrap and the content to fit without horizontal scrolling.
+   This checks the basic responsive shell styling.
+3. Stop the dev server with Ctrl+C.
+
+From `apps/web`, run the rendering test and production build:
+
+```bash
+npm test
+npm run build
+```
+
+The test uses Vitest, React Testing Library, and jsdom to check the application
+heading and placeholder. The build type-checks source, tests, and configuration
+before writing production assets to `apps/web/dist`. These checks do not verify
+visual layout in a real browser. Frontend execution is not part of Compose or
+the existing API CI workflow yet.
 
 ## Docker Compose development environment
 
