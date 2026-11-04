@@ -1,6 +1,7 @@
 # Testing and CI
 
-Run npm commands from `apps/api`. No new dependencies are needed beyond the
+Run backend npm commands from `apps/api`; frontend commands below use `apps/web`.
+No new dependencies are needed beyond the
 existing development packages; PostgreSQL-backed tests additionally need a
 dedicated database and the `psql` client. See [database setup](../db/README.md).
 
@@ -74,15 +75,66 @@ enabled, type-checks tests, and builds on Node.js 24. It performs no deployment.
 
 ## Verify GitHub Actions
 
-Open a pull request or push to `main` to trigger [API checks](../.github/workflows/ci.yml).
+Open a pull request or push to `main` to trigger [Application checks](../.github/workflows/ci.yml).
 A push to another branch alone does not trigger the current workflow. In the PR's
 Checks tab or repository Actions tab, confirm `test-and-build` passes dependency
 installation, migrations/schema verification, the full suite without database-test
 skips, test type-checking, and the build. After merging, check the run on `main` too.
-Local success does not establish that a GitHub-hosted run passed; inspect its logs.
+Also confirm the `frontend` job passes unit tests, the type-checked build, Chromium
+installation, and the Compose/Playwright suite. Failure screenshots and traces
+are uploaded as artifacts. Local success does not establish that a GitHub-hosted
+run passed; inspect its logs.
 
 For migration subprocess failures, diagnostics report a sanitized exit status
 and SQLSTATE. Exit 2 indicates a connection failure; the deliberate rollback test
 requires exit 3 and SQLSTATE `42P07` (duplicate table). Connection URLs are passed
 to `psql --dbname`; do not put the full URL in `PGDATABASE` or override arguments
 in a wrapper. No raw connection diagnostics or credentials should be published.
+
+## Browser end-to-end tests
+
+From `apps/web`, with Docker running and Node.js 24 available:
+
+```bash
+npm ci
+npm test
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+On Linux, `npx playwright install --with-deps chromium` also installs required
+system libraries (CI uses this command). Browser installation downloads test
+binaries; no public HTTP services are contacted by the tests themselves.
+
+`test:e2e` builds and starts the normal Compose stack with `compose.e2e.yaml`
+under a randomly named `endpoint-watch-e2e-*` project. It uses random loopback
+ports, a random temporary database password, and a new project-scoped volume.
+It does not load your root `.env`. The test override excludes the scheduled worker;
+normal development worker behavior is unchanged. Fixed SQL fixtures replace only
+this disposable test database's monitors/results, so results do not depend on
+worker timing, live services, or previous development data. Never apply
+`apps/web/e2e/fixtures.sql` to a development database: it truncates both tables.
+
+Playwright runs Chromium against the built Nginx frontend and real Express/API
+repositories backed by PostgreSQL. Tests verify same-origin requests, dashboard
+outcomes, monitor selection, keyboard focus, persisted history fields, and empty
+history. There are no mocked API responses in this suite. Browser contexts are
+isolated per test; fixtures are read-only during tests. Vitest covers polling,
+partial failures, stale-data behavior, and recovery deterministically with fake
+timers. Existing backend integration tests cover scheduler writes and SQL failures;
+the browser suite intentionally does not run the worker.
+
+The runner removes its own containers, network, and test volume in cleanup,
+including on test failures. It prints its unique project name; if forcibly killed
+or Docker becomes unavailable, remove only that printed project's resources.
+Do not run `down --volumes` against your normal development project as test cleanup.
+
+Reports are written to `apps/web/playwright-report` and failure traces/screenshots
+to `apps/web/test-results`; both are Git-ignored. From `apps/web`, inspect a report
+with `npx playwright show-report`. A failing run is not retried automatically.
+The runner supplies `PLAYWRIGHT_BASE_URL` to Playwright; invoke `npm run test:e2e`
+rather than starting tests against a shared development database.
+
+The frontend CI job runs these commands on a GitHub-hosted Linux runner with
+Docker. It does not deploy, publish images, or release the application.

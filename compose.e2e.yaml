@@ -1,0 +1,4 @@
+# Applied only by apps/web/scripts/test-e2e.mjs to an isolated Compose project.
+services:
+  worker:
+    profiles: [scheduled-monitoring]

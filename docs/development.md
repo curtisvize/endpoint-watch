@@ -34,8 +34,9 @@ API_PROXY_TARGET=http://127.0.0.1:3001 npm run dev
 This setting is read by Vite's server configuration, not embedded as a backend
 hostname in browser code. The root Compose `.env` is not automatically loaded by
 this command; supply the override in the shell. The proxy applies only to Vite
-development, not production build output. Production serving will need `/api`
-forwarding configured separately. Only `/api` is proxied, not `/health`.
+development, not production build output. In Compose, the `web` service serves
+built assets using Nginx and forwards `/api/` to Express internally. Only `/api`
+is proxied; `/health` remains an API-only endpoint.
 
 Manual verification:
 
@@ -129,8 +130,9 @@ rather than launching overlapping requests. New selections replace old detail
 requests, while the selected ID is retained through ordinary monitor-list reloads.
 The build type-checks source, tests, and configuration
 before writing production assets to `apps/web/dist`. These checks do not verify
-visual layout in a real browser. Frontend execution is not part of Compose or
-the existing API CI workflow yet.
+visual layout in a real browser. Compose also serves the built frontend without
+Vite, at `http://127.0.0.1:8080` by default. CI runs frontend unit tests, the build,
+and Playwright against the built Compose frontend; see [testing](testing.md#browser-end-to-end-tests).
 
 ## Docker Compose development environment
 
@@ -148,7 +150,7 @@ docker compose logs -f api worker
 ```
 
 Compose starts PostgreSQL, a one-shot migration service, a mock API, the Express
-API, and a separate monitoring worker. PostgreSQL health gates migrations;
+API, a separate monitoring worker, and the built React frontend (`web`). PostgreSQL health gates migrations;
 successful migrations and mock API health gate API/worker startup. Migration
 failure prevents dependent services from starting. The API health check exercises
 the database-backed monitor list; the worker check verifies process liveness,
@@ -163,11 +165,24 @@ delayed (`/delay`). Existing monitor settings are not reset. The mock delay
 defaults to 6000ms, exceeding the worker's default 5000ms timeout. Override
 `MOCK_DELAY_MS` or `MONITOR_TIMEOUT_MS` in `.env` as needed.
 
-Only the Express API is published, at `http://127.0.0.1:3000` (override `API_PORT`
-in `.env`). PostgreSQL and the mock API have no host port mappings. Containers
+The frontend is published at `http://127.0.0.1:8080` (`WEB_PORT`), and Express
+at `http://127.0.0.1:3000` (`API_PORT`), both on the loopback interface.
+PostgreSQL and the mock API have no host port mappings. Containers
 use service DNS names `postgres` and `mock-api`, rather than host `localhost`.
 The mock has no configuration/control routes and is for development only.
 The API, worker, and mock share the compiled Node image with different commands.
+The frontend has its own multi-stage Dockerfile: Node builds the assets, then
+Nginx serves only `dist` and a small configuration file. Node dependencies and
+source/test files are excluded from the runtime image. Nginx listens on container
+port 8080 and forwards `/api/` with the original path/query to `api:3000` using
+Docker DNS. Browser code keeps relative URLs and needs no Docker hostname or CORS
+setting. The proxy re-resolves API addresses when containers are recreated.
+The web service waits for API readiness; its `/healthz` check tests Nginx liveness.
+It is not a database health check. Use the dashboard/API to verify full routing.
+
+For a changed frontend, run `docker compose up -d --build --wait` to rebuild and
+serve it. `API_PROXY_TARGET` affects native Vite development only; it does not
+configure Nginx or the built browser bundle.
 
 ```bash
 curl http://127.0.0.1:3000/health
