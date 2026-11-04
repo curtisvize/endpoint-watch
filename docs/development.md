@@ -8,7 +8,7 @@ for the shortest path, [API reference](api.md) for responses, and
 
 ## Run the frontend locally
 
-The initial React/Vite/TypeScript shell is in `apps/web`, with its own package
+The React/Vite/TypeScript frontend is in `apps/web`, with its own package
 and lockfile. Use Node.js 24 to match the project's development environment.
 From `apps/web`:
 
@@ -18,18 +18,46 @@ npm run dev
 ```
 
 Open the local URL Vite prints (normally `http://127.0.0.1:5173`). Expect an
-Endpoint Watch heading and a placeholder for endpoint status and check history.
-This scaffold has no API calls or monitoring components, so neither PostgreSQL
-nor the backend/Compose stack needs to be running.
+Endpoint Watch heading and configured monitors loaded from the backend. Start
+the backend first from the repository root with `docker compose up -d --build --wait`
+(after configuring `.env` as described below), or use a locally configured Express
+API with a migrated PostgreSQL database.
+
+Browser code requests relative `/api` URLs. Vite's development proxy forwards
+them to `http://127.0.0.1:3000`, preserving the path. If the API uses another local
+port, start Vite from `apps/web` with the corresponding target, for example:
+
+```bash
+API_PROXY_TARGET=http://127.0.0.1:3001 npm run dev
+```
+
+This setting is read by Vite's server configuration, not embedded as a backend
+hostname in browser code. The root Compose `.env` is not automatically loaded by
+this command; supply the override in the shell. The proxy applies only to Vite
+development, not production build output. Production serving will need `/api`
+forwarding configured separately. Only `/api` is proxied, not `/health`.
 
 Manual verification:
 
-1. Open the printed URL and confirm the heading and placeholder are visible.
-   This checks the browser entry point and React rendering.
-2. Resize the browser to a narrow mobile width (about 320px), then a desktop
+1. With the backend running, open Vite's printed URL. Expect a brief loading
+   message, followed by the configured monitor names and intervals. A fresh
+   Compose database includes Mock healthy, Mock HTTP error, and Mock delayed.
+   This checks React loading data through the local development proxy.
+2. In browser developer tools, inspect the Network panel: `/api/monitors` should
+   return HTTP 200 with a `data` array from the frontend's origin. There should
+   be no browser request to a Docker service name. React Strict Mode may abort
+   its first development request and start another; that is expected.
+3. Resize the browser to a narrow mobile width (about 320px), then a desktop
    width. Expect text to wrap and the content to fit without horizontal scrolling.
    This checks the basic responsive shell styling.
-3. Stop the dev server with Ctrl+C.
+4. To check failure handling with Compose, run `docker compose stop api` from
+   the repository root and reload the browser. Expect the error message rather
+   than an empty monitor list. Restore with `docker compose up -d --wait api`
+   and reload. There is no automatic retry or refresh. An API response with
+   `data: []` instead shows “No monitors are configured yet”; this state is
+   covered by the mocked-response tests without deleting development data.
+5. Stop Vite with Ctrl+C. Use `docker compose down` from the repository root
+   when finished with the backend; this preserves database history.
 
 From `apps/web`, run the rendering test and production build:
 
@@ -38,8 +66,13 @@ npm test
 npm run build
 ```
 
-The test uses Vitest, React Testing Library, and jsdom to check the application
-heading and placeholder. The build type-checks source, tests, and configuration
+Tests use mocked fetch responses with Vitest, React Testing Library, and jsdom
+to check loading, monitor lists, empty/error states, and unmount cancellation.
+Client tests cover list/detail/history contracts, HTTP/network errors, invalid
+response envelopes, and bounded history limits. IDs remain strings and timestamps
+remain ISO strings. The UI loads once per mount; history client functions are
+available but no history UI or status summaries are implemented yet.
+The build type-checks source, tests, and configuration
 before writing production assets to `apps/web/dist`. These checks do not verify
 visual layout in a real browser. Frontend execution is not part of Compose or
 the existing API CI workflow yet.
