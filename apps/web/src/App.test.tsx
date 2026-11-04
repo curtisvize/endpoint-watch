@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { App } from './App';
 
@@ -10,7 +10,7 @@ it('renders the heading and loading state', () => {
   expect(screen.getByRole('status').textContent).toBe('Loading monitors…');
 });
 it('renders monitor names, intervals, and disabled configuration', async () => {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ data: [
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(async (path: string) => Response.json({ data: path.includes('/checks') ? [] : [
     { id: '9007199254740993', name: 'Billing API', intervalSeconds: 60, enabled: true, createdAt: '2026-11-04T12:00:00Z' },
     { id: '2', name: 'Search API', intervalSeconds: 30, enabled: false, createdAt: '2026-11-04T12:00:00Z' },
   ] })));
@@ -18,8 +18,8 @@ it('renders monitor names, intervals, and disabled configuration', async () => {
   expect(await screen.findByRole('heading', { name: 'Billing API' })).toBeTruthy();
   expect(screen.getByRole('heading', { name: 'Search API' })).toBeTruthy();
   expect(screen.getByText('Configured interval: 60 seconds')).toBeTruthy();
-  expect(screen.getByText('Monitoring disabled')).toBeTruthy();
-  expect(screen.queryByRole('status')).toBeNull();
+  expect(screen.getByText('Disabled — scheduled checks paused')).toBeTruthy();
+  await waitFor(() => expect(screen.queryAllByText('Loading latest check')).toHaveLength(1));
 });
 it('renders an empty state', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ data: [] })));
