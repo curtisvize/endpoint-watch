@@ -1,20 +1,14 @@
-import { useEffect, useState } from 'react';
-import { listMonitors, type Monitor } from './api/monitors';
+import { useCallback, useState } from 'react';
+import { listMonitors } from './api/monitors';
 import { MonitorOverview } from './components/MonitorOverview';
-
-type MonitorState = { kind: 'loading' } | { kind: 'loaded'; monitors: Monitor[] } | { kind: 'error' };
+import { RefreshNotice } from './components/RefreshNotice';
+import { usePolling } from './hooks/usePolling';
 
 export function App() {
-  const [state, setState] = useState<MonitorState>({ kind: 'loading' });
-  useEffect(() => {
-    const controller = new AbortController();
-    void listMonitors(controller.signal).then(
-      (monitors) => { if (!controller.signal.aborted) setState({ kind: 'loaded', monitors }); },
-      () => { if (!controller.signal.aborted) setState({ kind: 'error' }); },
-    );
-    return () => controller.abort();
-  }, []);
-
+  const [refreshKey, setRefreshKey] = useState(0);
+  const load = useCallback(async (signal: AbortSignal) => ({ data: await listMonitors(signal) }), []);
+  const polling = usePolling(load, refreshKey);
+  const monitors = polling.data;
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -23,16 +17,17 @@ export function App() {
         <p>A clear view of your services, all in one place.</p>
       </header>
       <main>
+        <button type="button" disabled={polling.refreshing} onClick={() => setRefreshKey((value) => value + 1)}>Refresh</button>
+        <p>Automatic refresh runs about every 15 seconds after requests complete.</p>
+        <RefreshNotice state={polling} label="Monitor list" hasData={monitors !== undefined} />
         <section className="placeholder" aria-labelledby="monitors-heading">
           <h2 id="monitors-heading">Configured monitors</h2>
-          {state.kind === 'loading' && <p role="status">Loading monitors…</p>}
-          {state.kind === 'error' && <p role="alert">Unable to load monitors. Check that the API is running, then reload the page.</p>}
-          {state.kind === 'loaded' && (
-            <>
-              {state.monitors.length === 0 && <p>No monitors are configured yet.</p>}
-              <MonitorOverview monitors={state.monitors} />
-            </>
-          )}
+          {monitors === undefined && polling.refreshing && <p role="status">Loading monitors…</p>}
+          {monitors === undefined && polling.failed && <p role="alert">Unable to load monitors. Check that the API is running; refresh or wait for an automatic retry.</p>}
+          {monitors !== undefined && <>
+            {monitors.length === 0 && <p>No monitors are configured yet.</p>}
+            <MonitorOverview monitors={monitors} refreshKey={refreshKey} />
+          </>}
         </section>
       </main>
     </div>

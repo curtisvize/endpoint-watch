@@ -82,3 +82,7 @@ table { width: 100%; border-collapse: collapse; text-align: left; }
 caption { text-align: left; font-weight: 600; padding-block: 1rem; }
 th, td { vertical-align: top; padding: 0.75rem; border-bottom: 1px solid #d8e2e7; }
 td { overflow-wrap: anywhere; min-width: 7rem; }
+
+.refresh-notice { font-size: 0.9rem; color: #526772; }
+.stale-warning { color: #754500; background: #fff2d5; padding: 0.5rem; border-left: 3px solid #ad6800; }
+button:disabled { cursor: wait; opacity: 0.65; }
