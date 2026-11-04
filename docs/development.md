@@ -40,11 +40,16 @@ forwarding configured separately. Only `/api` is proxied, not `/health`.
 Manual verification:
 
 1. With the backend running, open Vite's printed URL. Expect a brief loading
-   message, followed by the configured monitor names and intervals. A fresh
+   message, followed by monitor cards and a summary. Each card shows the name,
+   enabled/disabled configuration, latest recorded outcome, response time in
+   milliseconds, and last checked time in UTC. A fresh
    Compose database includes Mock healthy, Mock HTTP error, and Mock delayed.
-   This checks React loading data through the local development proxy.
+   After the worker has run, expect Healthy, HTTP error, and Timeout respectively
+   with default mock settings. The summary should count each once. This checks
+   the overview loading persisted results through the development proxy.
 2. In browser developer tools, inspect the Network panel: `/api/monitors` should
-   return HTTP 200 with a `data` array from the frontend's origin. There should
+   return HTTP 200 with a `data` array from the frontend's origin. Expect one
+   `/api/monitors/<id>/checks?limit=1` request per listed monitor. There should
    be no browser request to a Docker service name. React Strict Mode may abort
    its first development request and start another; that is expected.
 3. Resize the browser to a narrow mobile width (about 320px), then a desktop
@@ -56,7 +61,18 @@ Manual verification:
    and reload. There is no automatic retry or refresh. An API response with
    `data: []` instead shows “No monitors are configured yet”; this state is
    covered by the mocked-response tests without deleting development data.
-5. Stop Vite with Ctrl+C. Use `docker compose down` from the repository root
+5. To inspect partial failures without changing database data, use browser
+   developer tools' request blocking (if available) to block one monitor's
+   `/api/monitors/<id>/checks?limit=1` URL and reload. Expect that card to show
+   “Latest check unavailable,” with the other cards still populated. The summary
+   counts it as unavailable, not unhealthy or unchecked. Remove the block and
+   reload afterward. A monitor with empty history instead shows “No recorded
+   checks.” Existing disabled monitors show “Disabled — scheduled checks paused”
+   separately from any retained outcome. These cases are also covered by tests.
+6. Wait for another worker interval without reloading: displayed values should
+   stay unchanged because this view does not auto-refresh. Reload to fetch the
+   latest results. Disabled monitors' retained results may be older than others.
+7. Stop Vite with Ctrl+C. Use `docker compose down` from the repository root
    when finished with the backend; this preserves database history.
 
 From `apps/web`, run the rendering test and production build:
@@ -70,8 +86,11 @@ Tests use mocked fetch responses with Vitest, React Testing Library, and jsdom
 to check loading, monitor lists, empty/error states, and unmount cancellation.
 Client tests cover list/detail/history contracts, HTTP/network errors, invalid
 response envelopes, and bounded history limits. IDs remain strings and timestamps
-remain ISO strings. The UI loads once per mount; history client functions are
-available but no history UI or status summaries are implemented yet.
+remain ISO strings. The overview loads the list once per mount, then loads each
+latest result independently. Summary outcome counts include disabled monitors'
+latest recorded checks; the disabled count is a separate configuration count.
+Loading, unavailable, and unchecked histories are separate summary categories.
+No multi-result history view or auto-refresh is implemented yet.
 The build type-checks source, tests, and configuration
 before writing production assets to `apps/web/dist`. These checks do not verify
 visual layout in a real browser. Frontend execution is not part of Compose or

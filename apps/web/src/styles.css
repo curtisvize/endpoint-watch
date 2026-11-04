@@ -57,8 +57,18 @@ p { overflow-wrap: anywhere; }
   font-size: 0.9rem;
 }
 
-.monitor-list { padding: 0; margin: 0; list-style: none; }
-.monitor-list li { padding-block: 1rem; overflow-wrap: anywhere; }
-.monitor-list li + li { border-top: 1px solid #d8e2e7; }
-.monitor-list h3 { margin: 0 0 0.25rem; }
-.monitor-list p { margin: 0.25rem 0; }
+dl { margin: 0; }
+dd { margin: 0; }
+dt { color: #526772; font-size: 0.9rem; }
+.overview-summary { margin-bottom: 2rem; }
+.summary-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
+.summary-counts dd { font-weight: 700; font-size: 1.5rem; }
+.monitor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 1rem; list-style: none; margin: 0; padding: 0; }
+.monitor-grid li { min-width: 0; }
+.monitor-card { height: 100%; border: 1px solid #d8e2e7; border-radius: 8px; padding: 1rem; overflow-wrap: anywhere; }
+.monitor-card h3 { margin: 0 0 0.5rem; }
+.monitor-configuration { font-weight: 600; }
+.monitor-details { display: grid; gap: 1rem; }
+.outcome { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; background: #edf2f5; color: #344c58; font-weight: 600; }
+.outcome-healthy { background: #e0f3e8; color: #1c5b38; }
+.outcome-http_error, .outcome-timeout, .outcome-connection_error { background: #fbe8e5; color: #87342b; }
