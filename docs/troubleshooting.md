@@ -4,7 +4,7 @@ Run Compose commands from the repository root. Start with:
 
 ```bash
 docker compose ps -a
-docker compose logs --tail=50 postgres migrate api worker mock-api
+docker compose logs --tail=50 postgres migrate api worker mock-api web
 ```
 
 These show service states and recent diagnostics. Logs may contain local
@@ -113,3 +113,28 @@ failures (exit 3). The rollback test deliberately requires SQLSTATE `42P07`.
 Wrappers must pass through `--dbname` and `PGOPTIONS` unchanged. Do not put a full
 connection URL in `PGDATABASE`. See [CI verification](testing.md#verify-github-actions)
 for checking the hosted run; local success does not establish hosted success.
+
+## Frontend container or browser API requests fail
+
+Use `WEB_PORT` in `.env` if host port 8080 is occupied, then recreate the environment
+with `docker compose up -d --build --wait`. Nginx listens on container port 8080
+regardless of the host port. The API and web ports are both bound to loopback.
+
+```bash
+docker compose logs --tail=50 web api
+docker compose ps -a
+```
+
+A healthy `web` service means Nginx serves `/healthz`; it does not establish that
+API reads succeed. Inspect `/api/monitors` in browser DevTools. It should use the
+same origin as the page, not `api:3000` or another Docker hostname. HTTP 502/504
+can indicate an unavailable API upstream. `/health` is not forwarded; query the
+API port for Express health. Native Vite uses `API_PROXY_TARGET`, while the
+Compose frontend uses Nginx's internal service proxy.
+
+After frontend edits, rebuild the web image using the documented Compose rebuild
+command. The container serves compiled assets and does not provide live reload.
+For Playwright failures, verify Docker is available and Chromium is installed;
+see [browser tests](testing.md#browser-end-to-end-tests). Inspect the HTML report
+and failure trace before changing timeouts. Fixed browser fixtures do not depend
+on the worker producing a new check.
