@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { getRecentChecks, type Monitor, type CheckHistoryEntry } from '../api/monitors';
+import { MonitorDetail } from './MonitorDetail';
+import { outcomeLabels, localCheckTime } from './check-format';
 
 type Latest = { kind: 'loading' } | { kind: 'unavailable' } | { kind: 'loaded'; check: CheckHistoryEntry | null };
-const outcomeLabels = {
-  healthy: 'Healthy', http_error: 'HTTP error', timeout: 'Timeout', connection_error: 'Connection error',
-};
 const summaryLabels = {
   ...outcomeLabels, unchecked: 'No recorded checks', unavailable: 'Latest check unavailable', loading: 'Loading latest check',
 };
@@ -13,18 +12,19 @@ function category(latest: Latest): Category {
   return latest.kind === 'loaded' ? latest.check?.outcome ?? 'unchecked' : latest.kind;
 }
 
-function MonitorCard({ monitor, latest }: { monitor: Monitor; latest: Latest }) {
+function MonitorCard({ monitor, latest, selected, onSelect }: { monitor: Monitor; latest: Latest; selected: boolean; onSelect: () => void }) {
   const check = latest.kind === 'loaded' ? latest.check : null;
   const label = summaryLabels[category(latest)];
   return (
     <article aria-labelledby={`monitor-${monitor.id}`} className="monitor-card">
       <h3 id={`monitor-${monitor.id}`}>{monitor.name}</h3>
+      <button id={`select-monitor-${monitor.id}`} type="button" aria-pressed={selected} aria-controls={selected ? 'monitor-detail' : undefined} onClick={onSelect}>View history for {monitor.name}</button>
       <p className="monitor-configuration">{monitor.enabled ? 'Enabled' : 'Disabled — scheduled checks paused'}</p>
       <p>Configured interval: {monitor.intervalSeconds} seconds</p>
       <dl className="monitor-details">
         <div><dt>Latest recorded outcome</dt><dd><span className={`outcome outcome-${category(latest)}`}>{label}</span></dd></div>
         <div><dt>Response time</dt><dd>{check ? `${check.responseTimeMs.toFixed(1)} ms` : 'Not available'}</dd></div>
-        <div><dt>Last checked (UTC)</dt><dd>{check ? <time dateTime={check.checkedAt}>{new Date(check.checkedAt).toUTCString()}</time> : 'Not available'}</dd></div>
+        <div><dt>Last checked (local time)</dt><dd>{check ? <time dateTime={check.checkedAt}>{localCheckTime(check.checkedAt)}</time> : 'Not available'}</dd></div>
       </dl>
       {latest.kind === 'unavailable' && <p className="placeholder-note">Could not retrieve history. Reload the page to try again.</p>}
     </article>
@@ -32,6 +32,7 @@ function MonitorCard({ monitor, latest }: { monitor: Monitor; latest: Latest }) 
 }
 
 export function MonitorOverview({ monitors }: { monitors: Monitor[] }) {
+  const [selected, setSelected] = useState<Monitor | null>(null);
   const [history, setHistory] = useState<Record<string, Latest>>({});
   useEffect(() => {
     const controller = new AbortController();
@@ -70,9 +71,13 @@ export function MonitorOverview({ monitors }: { monitors: Monitor[] }) {
       </section>
       <ul className="monitor-grid">
         {monitors.map((monitor) => <li key={monitor.id}>
-          <MonitorCard monitor={monitor} latest={history[monitor.id] ?? { kind: 'loading' }} />
+          <MonitorCard monitor={monitor} latest={history[monitor.id] ?? { kind: 'loading' }} selected={selected?.id === monitor.id} onSelect={() => setSelected(monitor)} />
         </li>)}
       </ul>
+      {selected && <MonitorDetail key={selected.id} monitor={selected} onClose={() => {
+        document.getElementById(`select-monitor-${selected.id}`)?.focus();
+        setSelected(null);
+      }} />}
     </>
   );
 }

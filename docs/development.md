@@ -42,7 +42,7 @@ Manual verification:
 1. With the backend running, open Vite's printed URL. Expect a brief loading
    message, followed by monitor cards and a summary. Each card shows the name,
    enabled/disabled configuration, latest recorded outcome, response time in
-   milliseconds, and last checked time in UTC. A fresh
+   milliseconds, and last checked time in your browser's local timezone. A fresh
    Compose database includes Mock healthy, Mock HTTP error, and Mock delayed.
    After the worker has run, expect Healthy, HTTP error, and Timeout respectively
    with default mock settings. The summary should count each once. This checks
@@ -72,7 +72,21 @@ Manual verification:
 6. Wait for another worker interval without reloading: displayed values should
    stay unchanged because this view does not auto-refresh. Reload to fetch the
    latest results. Disabled monitors' retained results may be older than others.
-7. Stop Vite with Ctrl+C. Use `docker compose down` from the repository root
+7. Tab to a monitor's “View history” button and activate it with Enter or Space.
+   Expect focus on the detail heading below the overview, showing the monitor's
+   name, enabled configuration, latest recorded outcome, and up to 20 checks,
+   newest first. Inspect the Network panel for `/api/monitors/<id>/checks?limit=20`.
+   Each row shows the local timestamp, outcome, HTTP code (or “Not available”),
+   response time, and the backend's sanitized error text (or “None”). The local
+   timezone is identified above the table; API timestamps remain UTC instants.
+8. Select another monitor and confirm its history replaces the previous panel.
+   On mobile, the table can scroll horizontally; its scroll region is keyboard
+   focusable. Activate “Close history” and expect focus to return to the monitor's
+   button. Empty history shows “No recorded checks”; block only the `limit=20`
+   request in DevTools and reopen to verify the detail error message while the
+   overview remains available. Remove the block afterward. These cases are also
+   covered by component tests; they require no database deletions.
+9. Stop Vite with Ctrl+C. Use `docker compose down` from the repository root
    when finished with the backend; this preserves database history.
 
 From `apps/web`, run the rendering test and production build:
@@ -90,7 +104,11 @@ remain ISO strings. The overview loads the list once per mount, then loads each
 latest result independently. Summary outcome counts include disabled monitors'
 latest recorded checks; the disabled count is a separate configuration count.
 Loading, unavailable, and unchecked histories are separate summary categories.
-No multi-result history view or auto-refresh is implemented yet.
+Selection loads a separate detail snapshot of the latest 20 checks. Closing or
+switching selection cancels outstanding detail requests, and closing restores
+focus to the overview button. Stored sanitized errors render as plain text.
+There is no routing, pagination, filtering, charting, or auto-refresh. Overview
+and detail snapshots may differ when the worker records a check between requests.
 The build type-checks source, tests, and configuration
 before writing production assets to `apps/web/dist`. These checks do not verify
 visual layout in a real browser. Frontend execution is not part of Compose or
