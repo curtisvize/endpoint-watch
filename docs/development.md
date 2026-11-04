@@ -56,22 +56,29 @@ Manual verification:
    width. Expect text to wrap and the content to fit without horizontal scrolling.
    This checks the basic responsive shell styling.
 4. To check failure handling with Compose, run `docker compose stop api` from
-   the repository root and reload the browser. Expect the error message rather
-   than an empty monitor list. Restore with `docker compose up -d --wait api`
-   and reload. There is no automatic retry or refresh. An API response with
+   the repository root while keeping the page open. Within a polling cycle, expect
+   stale-data warnings while existing cards/history remain visible. Restore with
+   `docker compose up -d --wait api`; wait for the next cycle or use Refresh and
+   expect the warnings to clear. For a fresh page load during the outage, expect
+   an initial loading error, not an empty list. An API response with
    `data: []` instead shows “No monitors are configured yet”; this state is
    covered by the mocked-response tests without deleting development data.
 5. To inspect partial failures without changing database data, use browser
    developer tools' request blocking (if available) to block one monitor's
    `/api/monitors/<id>/checks?limit=1` URL and reload. Expect that card to show
    “Latest check unavailable,” with the other cards still populated. The summary
-   counts it as unavailable, not unhealthy or unchecked. Remove the block and
-   reload afterward. A monitor with empty history instead shows “No recorded
+   counts an initially unavailable result separately from unhealthy or unchecked.
+   If the block is added after results have loaded, the next failed refresh keeps
+   the prior outcome and labels it stale. Remove the block and wait for recovery. A monitor with empty history instead shows “No recorded
    checks.” Existing disabled monitors show “Disabled — scheduled checks paused”
    separately from any retained outcome. These cases are also covered by tests.
-6. Wait for another worker interval without reloading: displayed values should
-   stay unchanged because this view does not auto-refresh. Reload to fetch the
-   latest results. Disabled monitors' retained results may be older than others.
+6. Wait approximately 15 seconds after the previous request cycle completes.
+   Expect new `/api` requests, advancing successful update timestamps, and newer
+   results where the worker has written checks. Press Refresh to update sooner;
+   the list's button is disabled while its request runs. Background refreshes keep
+   cards visible and do not move focus. Each section shows its last fully
+   successful update time; failures retain that time and mark old data stale.
+   Disabled monitors' retained checks may be older even after a successful read.
 7. Tab to a monitor's “View history” button and activate it with Enter or Space.
    Expect focus on the detail heading below the overview, showing the monitor's
    name, enabled configuration, latest recorded outcome, and up to 20 checks,
@@ -84,7 +91,8 @@ Manual verification:
    focusable. Activate “Close history” and expect focus to return to the monitor's
    button. Empty history shows “No recorded checks”; block only the `limit=20`
    request in DevTools and reopen to verify the detail error message while the
-   overview remains available. Remove the block afterward. These cases are also
+   overview remains available. If history was already loaded, it remains visible
+   with a stale-data warning. Remove the block to allow automatic recovery. These cases are also
    covered by component tests; they require no database deletions.
 9. Stop Vite with Ctrl+C. Use `docker compose down` from the repository root
    when finished with the backend; this preserves database history.
@@ -100,15 +108,25 @@ Tests use mocked fetch responses with Vitest, React Testing Library, and jsdom
 to check loading, monitor lists, empty/error states, and unmount cancellation.
 Client tests cover list/detail/history contracts, HTTP/network errors, invalid
 response envelopes, and bounded history limits. IDs remain strings and timestamps
-remain ISO strings. The overview loads the list once per mount, then loads each
-latest result independently. Summary outcome counts include disabled monitors'
+remain ISO strings. The list, overview latest checks, and selected history each
+poll approximately 15 seconds after their previous cycle finishes. Manual Refresh
+triggers those loaders too; an in-flight loader ignores duplicate triggers. Latest
+checks update independently within each overview cycle. Summary outcome counts include disabled monitors'
 latest recorded checks; the disabled count is a separate configuration count.
 Loading, unavailable, and unchecked histories are separate summary categories.
-Selection loads a separate detail snapshot of the latest 20 checks. Closing or
+Selection loads and polls the latest 20 checks for that monitor. Closing or
 switching selection cancels outstanding detail requests, and closing restores
 focus to the overview button. Stored sanitized errors render as plain text.
-There is no routing, pagination, filtering, charting, or auto-refresh. Overview
-and detail snapshots may differ when the worker records a check between requests.
+There is no routing, pagination, filtering, or charting. Overview and detail
+snapshots may differ when the worker records a check between requests. Last
+successful update times describe API retrieval, not the time the monitor was
+checked. They are shown separately for the list, latest checks, and history so
+partial successes do not imply the whole dashboard was updated. During a failed
+routine refresh, prior data and successful timestamps remain visible with stale
+warnings. Timers and requests are cleaned up on unmount or selection changes.
+There is no request timeout in the browser client: a still-pending cycle waits
+rather than launching overlapping requests. New selections replace old detail
+requests, while the selected ID is retained through ordinary monitor-list reloads.
 The build type-checks source, tests, and configuration
 before writing production assets to `apps/web/dist`. These checks do not verify
 visual layout in a real browser. Frontend execution is not part of Compose or
