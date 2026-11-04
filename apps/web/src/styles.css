@@ -72,3 +72,13 @@ dt { color: #526772; font-size: 0.9rem; }
 .outcome { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; background: #edf2f5; color: #344c58; font-weight: 600; }
 .outcome-healthy { background: #e0f3e8; color: #1c5b38; }
 .outcome-http_error, .outcome-timeout, .outcome-connection_error { background: #fbe8e5; color: #87342b; }
+
+button { font: inherit; cursor: pointer; color: #172b36; background: #edf2f5; border: 1px solid #93a9b4; border-radius: 4px; padding: 0.5rem 0.75rem; }
+button[aria-pressed="true"] { background: #d4e7ee; }
+:focus-visible { outline: 3px solid #176b8a; outline-offset: 3px; }
+.monitor-detail { margin-top: 2rem; padding-top: 1rem; border-top: 2px solid #d8e2e7; }
+.history-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+caption { text-align: left; font-weight: 600; padding-block: 1rem; }
+th, td { vertical-align: top; padding: 0.75rem; border-bottom: 1px solid #d8e2e7; }
+td { overflow-wrap: anywhere; min-width: 7rem; }
