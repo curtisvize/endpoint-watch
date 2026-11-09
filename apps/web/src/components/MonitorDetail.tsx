@@ -3,6 +3,7 @@ import { getRecentChecks, type Monitor } from '../api/monitors';
 import { usePolling } from '../hooks/usePolling';
 import { RefreshNotice } from './RefreshNotice';
 import { localCheckTime, outcomeLabels } from './check-format';
+import { ResultFreshness } from './ResultFreshness';
 
 export function MonitorDetail({ monitor, onClose, refreshKey = 0 }: { monitor: Monitor; onClose: () => void; refreshKey?: number }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -18,6 +19,7 @@ export function MonitorDetail({ monitor, onClose, refreshKey = 0 }: { monitor: M
       <button type="button" onClick={onClose}>Close history</button>
       <p>{monitor.enabled ? 'Enabled' : 'Disabled — scheduled checks paused'}</p>
       <p>Latest recorded outcome: {latest ? outcomeLabels[latest.outcome] : state.kind === 'loading' ? 'Loading…' : state.kind === 'error' ? 'Unavailable' : 'No recorded checks'}</p>
+      {state.kind === 'loaded' && <ResultFreshness monitor={monitor} checkedAt={latest?.checkedAt ?? null} />}
       <RefreshNotice state={polling} label="History" hasData={polling.data !== undefined} />
       {state.kind === 'loading' && <p role="status">Loading recent checks…</p>}
       {state.kind === 'error' && <p role="alert">Unable to load history. Refresh or wait for an automatic retry.</p>}

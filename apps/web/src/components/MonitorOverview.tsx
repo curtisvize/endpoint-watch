@@ -4,6 +4,7 @@ import { MonitorDetail } from './MonitorDetail';
 import { usePolling } from '../hooks/usePolling';
 import { RefreshNotice } from './RefreshNotice';
 import { outcomeLabels, localCheckTime } from './check-format';
+import { ResultFreshness } from './ResultFreshness';
 
 type Latest = { kind: 'loading' } | { kind: 'unavailable' } | { kind: 'loaded'; check: CheckHistoryEntry | null; stale?: boolean };
 const summaryLabels = {
@@ -28,6 +29,7 @@ function MonitorCard({ monitor, latest, selected, onSelect }: { monitor: Monitor
         <div><dt>Response time</dt><dd>{check ? `${check.responseTimeMs.toFixed(1)} ms` : 'Not available'}</dd></div>
         <div><dt>Last checked (local time)</dt><dd>{check ? <time dateTime={check.checkedAt}>{localCheckTime(check.checkedAt)}</time> : 'Not available'}</dd></div>
       </dl>
+      {latest.kind === 'loaded' && <ResultFreshness monitor={monitor} checkedAt={check?.checkedAt ?? null} />}
       {latest.kind === 'loaded' && latest.stale && <p className="stale-warning">Latest check refresh failed. This result may be stale.</p>}
       {latest.kind === 'unavailable' && <p className="placeholder-note">Could not retrieve history. Reload the page to try again.</p>}
     </article>
