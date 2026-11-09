@@ -1,13 +1,61 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { ApiError, getMonitor, getRecentChecks, listMonitors } from './monitors';
-afterEach(() => vi.unstubAllGlobals());
+import { ApiError, ApiTimeoutError, API_REQUEST_TIMEOUT_MS, getMonitor, getRecentChecks, listMonitors } from './monitors';
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 const monitor = { id: '9007199254740993', name: 'Service', intervalSeconds: 60, enabled: true, createdAt: '2026-11-04T12:00:00Z' };
 it('lists monitors using a relative URL and forwards cancellation', async () => {
   const client = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ data: [monitor] }));
   vi.stubGlobal('fetch', client);
   const controller = new AbortController();
   expect(await listMonitors(controller.signal)).toEqual([monitor]);
-  expect(client).toHaveBeenCalledWith('/api/monitors', { method: 'GET', signal: controller.signal });
+  expect(client).toHaveBeenCalledWith('/api/monitors', { method: 'GET', signal: expect.any(AbortSignal) });
+});
+
+it.each(['headers', 'body'])('bounds stalled %s even when cancellation is ignored', async (stage) => {
+  vi.useFakeTimers();
+  let requestSignal!: AbortSignal;
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((_path, options: RequestInit) => {
+    requestSignal = options.signal!;
+    if (stage === 'headers') return new Promise(() => {});
+    const response = Response.json({ data: [] });
+    vi.spyOn(response, 'json').mockImplementation(() => new Promise(() => {}));
+    return Promise.resolve(response);
+  }));
+  const request = listMonitors();
+  const rejected = expect(request).rejects.toBeInstanceOf(ApiTimeoutError);
+  await vi.advanceTimersByTimeAsync(API_REQUEST_TIMEOUT_MS);
+  await rejected;
+  expect(requestSignal.aborted).toBe(true);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('forwards caller cancellation without reporting a timeout and removes listeners', async () => {
+  vi.useFakeTimers();
+  const controller = new AbortController();
+  const remove = vi.spyOn(controller.signal, 'removeEventListener');
+  let requestSignal!: AbortSignal;
+  vi.stubGlobal('fetch', vi.fn().mockImplementation((_path, options: RequestInit) => {
+    requestSignal = options.signal!;
+    return new Promise(() => {});
+  }));
+  const request = listMonitors(controller.signal);
+  const rejected = expect(request).rejects.toMatchObject({ name: 'AbortError' });
+  controller.abort();
+  await rejected;
+  expect(requestSignal.aborted).toBe(true);
+  expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('does not fetch when already cancelled, and clears deadlines after success', async () => {
+  vi.useFakeTimers();
+  const client = vi.fn().mockResolvedValue(Response.json({ data: [] }));
+  vi.stubGlobal('fetch', client);
+  const controller = new AbortController();
+  controller.abort();
+  await expect(listMonitors(controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+  expect(client).not.toHaveBeenCalled();
+  expect(await listMonitors()).toEqual([]);
+  expect(vi.getTimerCount()).toBe(0);
 });
 it('retrieves one monitor and encodes IDs', async () => {
   const client = vi.fn<typeof fetch>().mockImplementation(async () => Response.json({ data: monitor }));
