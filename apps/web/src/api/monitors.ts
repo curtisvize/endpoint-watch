@@ -22,7 +22,35 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 }
+export const API_REQUEST_TIMEOUT_MS = 10_000;
+export class ApiTimeoutError extends ApiError {
+  constructor() {
+    super('Monitoring API request timed out.');
+    this.name = 'ApiTimeoutError';
+  }
+}
+
 async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
+  signal?.throwIfAborted();
+  const controller = new AbortController();
+  const cancel = () => controller.abort(signal?.reason);
+  signal?.addEventListener('abort', cancel, { once: true });
+  let rejectCancellation!: (reason: unknown) => void;
+  const cancellation = new Promise<never>((_resolve, reject) => { rejectCancellation = reject; });
+  const onAbort = () => rejectCancellation(controller.signal.reason);
+  controller.signal.addEventListener('abort', onAbort, { once: true });
+  const timer = setTimeout(() => controller.abort(new ApiTimeoutError()), API_REQUEST_TIMEOUT_MS);
+  try {
+    // Settle even if a stalled client/body reader does not honor cancellation.
+    return await Promise.race([read<T>(path, controller.signal), cancellation]);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', cancel);
+    controller.signal.removeEventListener('abort', onAbort);
+  }
+}
+
+async function read<T>(path: string, signal: AbortSignal): Promise<T> {
   let response: Response;
   try {
     response = await fetch(path, { method: 'GET', signal });

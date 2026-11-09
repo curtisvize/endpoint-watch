@@ -138,3 +138,32 @@ rather than starting tests against a shared development database.
 
 The frontend CI job runs these commands on a GitHub-hosted Linux runner with
 Docker. It does not deploy, publish images, or release the application.
+
+## Dashboard request deadlines and recovery
+
+Frontend API reads have a centralized 10-second deadline
+(`API_REQUEST_TIMEOUT_MS` in `apps/web/src/api/monitors.ts`), including reading
+the response body. Timeout errors use `ApiTimeoutError`; HTTP failures retain
+their HTTP status. This deadline is separate from the worker's endpoint-check
+timeout. Polling retries about 15 seconds after a failed request settles, retains
+previously loaded data, and displays stale-data warnings. Selection changes and
+unmounts cancel obsolete requests without presenting cancellation as a failure.
+
+Vitest covers stalled headers and body reads, initial/background timeout recovery,
+retained history and selection, overlap protection, cancellation, and late results.
+Run `npm test` and `npm run build` from `apps/web`.
+
+For manual verification against your local Compose environment:
+
+1. Run `docker compose up -d --build web` from the repository root, hard-refresh
+   the dashboard tab, and select a monitor to load its history.
+2. Run `docker compose pause api`. Click **Refresh**; within approximately
+   10 seconds, expect refresh-failure/stale-data warnings while the previous
+   monitor list and history remain visible. The Refresh button becomes available
+   again. Pausing simulates an unresponsive API; it does not reset the database.
+3. Run `docker compose unpause api` to restore the API. Click **Refresh** or wait
+   for automatic retries. Expect warnings to clear after successful reads, the
+   selected monitor to remain open, and successful-update timestamps to advance.
+
+Always unpause the API after this check. Offline or connection-refused errors may
+fail immediately; these exercise failure recovery rather than the full deadline.
