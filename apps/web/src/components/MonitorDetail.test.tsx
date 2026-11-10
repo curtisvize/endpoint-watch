@@ -22,6 +22,9 @@ it('selects a monitor, focuses details, renders history in local time, and resto
   const panel = screen.getByRole('region', { name: 'Billing API — recent history' });
   expect(document.activeElement).toBe(within(panel).getByRole('heading'));
   const table = await within(panel).findByRole('table', { name: 'Recent checks for Billing API' });
+  const chart = within(panel).getByRole('img', { name: /Response times for recent checks/ });
+  expect(chart.querySelectorAll('.chart-http-error')).toHaveLength(1);
+  expect(chart.querySelectorAll('.chart-healthy')).toHaveLength(0);
   expect(within(panel).getByText('Latest recorded outcome: HTTP error')).toBeTruthy();
   expect(within(table).getByText('503')).toBeTruthy();
   expect(within(table).getByText('12.5 ms')).toBeTruthy();

@@ -4,6 +4,7 @@ import { usePolling } from '../hooks/usePolling';
 import { RefreshNotice } from './RefreshNotice';
 import { localCheckTime, outcomeLabels } from './check-format';
 import { ResultFreshness } from './ResultFreshness';
+import { ResponseTimeChart } from './ResponseTimeChart';
 
 export function MonitorDetail({ monitor, onClose, refreshKey = 0 }: { monitor: Monitor; onClose: () => void; refreshKey?: number }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -23,6 +24,7 @@ export function MonitorDetail({ monitor, onClose, refreshKey = 0 }: { monitor: M
       <RefreshNotice state={polling} label="History" hasData={polling.data !== undefined} />
       {state.kind === 'loading' && <p role="status">Loading recent checks…</p>}
       {state.kind === 'error' && <p role="alert">Unable to load history. Refresh or wait for an automatic retry.</p>}
+      {state.kind === 'loaded' && <ResponseTimeChart checks={state.checks} />}
       {state.kind === 'loaded' && (state.checks.length === 0 ? <p>No recorded checks for this monitor.</p> : (
         <>
           <p>The latest {state.checks.length} recorded checks, newest first. Times are in your local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}).</p>

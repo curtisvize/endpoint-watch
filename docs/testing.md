@@ -167,3 +167,26 @@ For manual verification against your local Compose environment:
 
 Always unpause the API after this check. Offline or connection-refused errors may
 fail immediately; these exercise failure recovery rather than the full deadline.
+
+## Response-time chart verification
+
+Rebuild the frontend with `docker compose up -d --build web`, hard-refresh the
+browser, and select a monitor. The detail view charts its already-loaded recent
+history in chronological order while retaining the newest-first table. The
+horizontal axis uses local check-start times; the vertical axis uses milliseconds
+until HTTP response headers. Healthy responses use circles and HTTP errors use
+diamonds. Timeout and connection-failure durations are excluded and counted in
+the explanatory text; their full records remain in the table. A history containing
+only these failures keeps the chart visible with an explanatory message and an
+outcome strip. The strip shares the time axis with the latency plot and shows
+every check: circles for healthy responses, diamonds for HTTP errors, triangles
+for timeouts, and crosses for connection failures. Outcome markers have no
+millisecond value. Thin lines join consecutive HTTP responses and break at
+timeouts or connection failures.
+
+Check the healthy, HTTP-error, and delayed development monitors. Resize the
+browser to a narrow viewport and confirm the chart stays readable, scrolling
+horizontally when necessary. A single HTTP result should show one point; empty
+history should show an explanatory message. Vitest covers these data cases,
+ordering, irregular timestamp spacing, tied timestamps, zero durations, marker
+shapes, and chart integration with the detail table.
