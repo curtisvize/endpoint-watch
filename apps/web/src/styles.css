@@ -87,3 +87,19 @@ td { overflow-wrap: anywhere; min-width: 7rem; }
 .result-freshness { font-size: 0.9rem; color: #526772; }
 .stale-warning { color: #754500; background: #fff2d5; padding: 0.5rem; border-left: 3px solid #ad6800; }
 button:disabled { cursor: wait; opacity: 0.65; }
+
+.response-time-chart { margin: 1.5rem 0; }
+.response-time-chart figcaption { font-weight: 700; }
+.response-time-chart p { font-size: 0.9rem; }
+.chart-scroll { overflow-x: auto; }
+.response-time-chart svg { display: block; width: 100%; min-width: 360px; max-width: 720px; font-size: 14px; fill: #344c58; }
+.chart-grid-line { stroke: #d8e2e7; }
+.chart-axis { stroke: #526772; }
+.chart-healthy { fill: #1c5b38; }
+.chart-http-error { fill: #87342b; }
+.chart-response-line { fill: none; stroke: #526772; stroke-width: 1.5; }
+.chart-outcome-healthy { fill: #1c5b38; }
+.chart-outcome-http_error { fill: #87342b; }
+.chart-outcome-timeout { fill: #754500; }
+.chart-outcome-connection_error { fill: none; stroke: #87342b; stroke-width: 2; }
+.chart-range { color: #526772; }
