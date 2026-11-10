@@ -17,8 +17,10 @@ export function App() {
         <p>A clear view of your services, all in one place.</p>
       </header>
       <main>
-        <button type="button" disabled={polling.refreshing} onClick={() => setRefreshKey((value) => value + 1)}>Refresh</button>
-        <p>Automatic refresh runs about every 15 seconds after requests complete.</p>
+        <div className="dashboard-toolbar">
+          <button type="button" disabled={polling.refreshing} onClick={() => setRefreshKey((value) => value + 1)}>Refresh</button>
+          <p>Auto-refresh · about every 15 seconds</p>
+        </div>
         <RefreshNotice state={polling} label="Monitor list" hasData={monitors !== undefined} />
         <section className="placeholder" aria-labelledby="monitors-heading">
           <h2 id="monitors-heading">Configured monitors</h2>

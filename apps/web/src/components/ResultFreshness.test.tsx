@@ -16,6 +16,14 @@ it('uses a minimum grace for short intervals and proportional grace for longer o
   expect(freshnessGraceSeconds(300)).toBe(150);
 });
 
+it('keeps the current label compact while making the threshold available in expandable help', () => {
+  render(<ResultFreshness monitor={monitor} checkedAt={check.checkedAt} />);
+  expect(screen.getByText('Freshness: Current')).toBeTruthy();
+  const help = screen.getByText('About freshness').closest('details')!;
+  expect(help.open).toBe(false);
+  expect(help.textContent).toContain('60 seconds plus 30 seconds of grace');
+});
+
 it('keeps delayed results current between dashboard polls and becomes overdue when checks stop', async () => {
   const origin = Date.parse(check.checkedAt);
   // Start between worker completions so dashboard polling can retain a result

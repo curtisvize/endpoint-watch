@@ -19,19 +19,24 @@ function MonitorCard({ monitor, latest, selected, onSelect }: { monitor: Monitor
   const check = latest.kind === 'loaded' ? latest.check : null;
   const label = summaryLabels[category(latest)];
   return (
-    <article aria-labelledby={`monitor-${monitor.id}`} className="monitor-card">
-      <h3 id={`monitor-${monitor.id}`}>{monitor.name}</h3>
-      <button id={`select-monitor-${monitor.id}`} type="button" aria-pressed={selected} aria-controls={selected ? 'monitor-detail' : undefined} onClick={onSelect}>View history for {monitor.name}</button>
-      <p className="monitor-configuration">{monitor.enabled ? 'Enabled' : 'Disabled — scheduled checks paused'}</p>
-      <p>Configured interval: {monitor.intervalSeconds} seconds</p>
+    <article aria-labelledby={`monitor-${monitor.id}`} className={`monitor-card${selected ? ' monitor-card-selected' : ''}`}>
+      <div className="monitor-card-heading">
+        <h3 id={`monitor-${monitor.id}`}>{monitor.name}</h3>
+        {selected && <span className="selection-label">Selected</span>}
+      </div>
       <dl className="monitor-details">
         <div><dt>Latest recorded outcome</dt><dd><span className={`outcome outcome-${category(latest)}`}>{label}</span></dd></div>
+      </dl>
+      {latest.kind === 'loaded' && <ResultFreshness monitor={monitor} checkedAt={check?.checkedAt ?? null} />}
+      <p className="monitor-configuration">{monitor.enabled ? 'Enabled' : 'Disabled — scheduled checks paused'}</p>
+      <p className="monitor-interval">Configured interval: {monitor.intervalSeconds} seconds</p>
+      <dl className="monitor-details monitor-metrics">
         <div><dt>Response time</dt><dd>{check ? `${check.responseTimeMs.toFixed(1)} ms` : 'Not available'}</dd></div>
         <div><dt>Last checked (local time)</dt><dd>{check ? <time dateTime={check.checkedAt}>{localCheckTime(check.checkedAt)}</time> : 'Not available'}</dd></div>
       </dl>
-      {latest.kind === 'loaded' && <ResultFreshness monitor={monitor} checkedAt={check?.checkedAt ?? null} />}
       {latest.kind === 'loaded' && latest.stale && <p className="stale-warning">Latest check refresh failed. This result may be stale.</p>}
-      {latest.kind === 'unavailable' && <p className="placeholder-note">Could not retrieve history. Reload the page to try again.</p>}
+      {latest.kind === 'unavailable' && <p className="placeholder-note">Could not retrieve history. Refresh or wait for an automatic retry.</p>}
+      <button className="monitor-select" id={`select-monitor-${monitor.id}`} type="button" aria-label={`View history for ${monitor.name}`} aria-pressed={selected} aria-controls={selected ? 'monitor-detail' : undefined} onClick={onSelect}>View history</button>
     </article>
   );
 }
@@ -74,7 +79,7 @@ export function MonitorOverview({ monitors, refreshKey = 0 }: { monitors: Monito
       <RefreshNotice state={polling} label="Latest checks" hasData={polling.data !== undefined} />
       <section aria-labelledby="summary-heading" className="overview-summary">
         <h3 id="summary-heading">Monitoring summary</h3>
-        <p>Latest recorded outcomes include disabled monitors; they do not indicate that checks are currently running.</p>
+        <p className="placeholder-note">Latest known outcomes, including disabled monitors.</p>
         <dl className="summary-counts" aria-live="polite">
           <div><dt>Configured monitors</dt><dd>{monitors.length}</dd></div>
           <div><dt>Disabled monitors</dt><dd>{monitors.filter((monitor) => !monitor.enabled).length}</dd></div>

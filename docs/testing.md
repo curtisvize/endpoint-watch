@@ -190,3 +190,22 @@ horizontally when necessary. A single HTTP result should show one point; empty
 history should show an explanatory message. Vitest covers these data cases,
 ordering, irregular timestamp spacing, tied timestamps, zero durations, marker
 shapes, and chart integration with the detail table.
+
+## Dashboard usability checks
+
+After rebuilding the web service, hard-refresh the browser and check desktop and
+narrow layouts (for example, 320 and 375 pixels wide). Monitor names should wrap
+without truncation or page-wide horizontal scrolling. The chart and history table
+retain their own keyboard-accessible horizontal scroll regions.
+
+Select **View history** with the mouse or keyboard. The selected card should have
+a highlighted border and a visible **Selected** label. The detail heading receives
+focus and scrolls into view without animation. Routine automatic/manual refreshes
+must leave focus and scroll position alone. **Close history** returns focus to the
+selected card's button.
+
+Each card shows its latest known outcome and a separate compact freshness label.
+**About freshness** expands the unchanged interval/grace explanation. Overdue and
+failed-refresh warnings remain visible without expanding help, and disabled
+monitors remain distinct from unhealthy monitors. Independent update timestamps
+remain available for the monitor list, latest checks, and selected history.

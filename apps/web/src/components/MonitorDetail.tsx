@@ -8,7 +8,10 @@ import { ResponseTimeChart } from './ResponseTimeChart';
 
 export function MonitorDetail({ monitor, onClose, refreshKey = 0 }: { monitor: Monitor; onClose: () => void; refreshKey?: number }) {
   const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { heading.current?.focus(); }, [monitor.id]);
+  useEffect(() => {
+    heading.current?.focus({ preventScroll: true });
+    heading.current?.scrollIntoView?.({ block: 'start', behavior: 'instant' });
+  }, [monitor.id]);
   const load = useCallback(async (signal: AbortSignal) => ({ data: await getRecentChecks(monitor.id, 20, signal) }), [monitor.id]);
   const polling = usePolling(load, refreshKey);
   const state = polling.data !== undefined ? { kind: 'loaded' as const, checks: polling.data } :
@@ -16,15 +19,17 @@ export function MonitorDetail({ monitor, onClose, refreshKey = 0 }: { monitor: M
   const latest = state.kind === 'loaded' ? state.checks[0] : undefined;
   return (
     <section id="monitor-detail" className="monitor-detail" aria-labelledby="detail-heading">
-      <h3 id="detail-heading" tabIndex={-1} ref={heading}>{monitor.name} — recent history</h3>
-      <button type="button" onClick={onClose}>Close history</button>
-      <p>{monitor.enabled ? 'Enabled' : 'Disabled — scheduled checks paused'}</p>
-      <p>Latest recorded outcome: {latest ? outcomeLabels[latest.outcome] : state.kind === 'loading' ? 'Loading…' : state.kind === 'error' ? 'Unavailable' : 'No recorded checks'}</p>
+      <div className="detail-header">
+        <h3 id="detail-heading" tabIndex={-1} ref={heading}>{monitor.name} — recent history</h3>
+        <button type="button" onClick={onClose}>Close history</button>
+      </div>
+      <p className={`detail-outcome outcome outcome-${latest?.outcome ?? 'unchecked'}`}>Latest recorded outcome: {latest ? outcomeLabels[latest.outcome] : state.kind === 'loading' ? 'Loading…' : state.kind === 'error' ? 'Unavailable' : 'No recorded checks'}</p>
       {state.kind === 'loaded' && <ResultFreshness monitor={monitor} checkedAt={latest?.checkedAt ?? null} />}
+      <p className="monitor-configuration">{monitor.enabled ? 'Enabled' : 'Disabled — scheduled checks paused'}</p>
       <RefreshNotice state={polling} label="History" hasData={polling.data !== undefined} />
       {state.kind === 'loading' && <p role="status">Loading recent checks…</p>}
       {state.kind === 'error' && <p role="alert">Unable to load history. Refresh or wait for an automatic retry.</p>}
-      {state.kind === 'loaded' && <ResponseTimeChart checks={state.checks} />}
+      {state.kind === 'loaded' && state.checks.length > 0 && <ResponseTimeChart checks={state.checks} />}
       {state.kind === 'loaded' && (state.checks.length === 0 ? <p>No recorded checks for this monitor.</p> : (
         <>
           <p>The latest {state.checks.length} recorded checks, newest first. Times are in your local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}).</p>
