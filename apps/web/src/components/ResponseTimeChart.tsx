@@ -10,7 +10,13 @@ export function ResponseTimeChart({ checks }: { checks: CheckHistoryEntry[] }) {
   return (
     <figure className="response-time-chart">
       <figcaption>Response-time history</figcaption>
-      <p>Healthy HTTP responses: circles. HTTP errors: diamonds. Timeouts: triangles. Connection failures: crosses. Lines connect consecutive HTTP responses and break at failed requests.</p>
+      <ul className="chart-legend" aria-label="Chart legend">
+        <li><span className="legend-healthy" aria-hidden="true">●</span> Healthy</li>
+        <li><span className="legend-error" aria-hidden="true">◆</span> HTTP error</li>
+        <li><span className="legend-timeout" aria-hidden="true">▲</span> Timeout</li>
+        <li><span className="legend-error" aria-hidden="true">×</span> Connection error</li>
+      </ul>
+      <p className="placeholder-note">Lines join consecutive HTTP responses; gaps indicate timeouts or connection failures.</p>
       {history.excludedCount > 0 && <p>{history.excludedCount} timeout or connection-failure checks excluded from latency measurements. See the history table for details.</p>}
       {checks.length === 0 ? <p>No recorded checks to chart.</p> : <>
           {history.points.length === 0 && <p>No HTTP responses recorded in this window. Check outcomes are shown below.</p>}
@@ -57,7 +63,7 @@ export function ResponseTimeChart({ checks }: { checks: CheckHistoryEntry[] }) {
               <text x="258" y="292" textAnchor="middle">Check start time (local)</text>
             </svg>
           </div>
-          <p className="chart-range">{localCheckTime(new Date(history.start).toISOString())}{history.start !== history.end && ` — ${localCheckTime(new Date(history.end).toISOString())}`}. Latency measures time until response headers. The table below provides all check outcomes.</p>
+          <p className="chart-range">{localCheckTime(new Date(history.start).toISOString())}{history.start !== history.end && ` — ${localCheckTime(new Date(history.end).toISOString())}`}. Latency measures time until response headers.</p>
         </>}
     </figure>
   );

@@ -11,7 +11,7 @@ const rows: CheckHistoryEntry[] = [
   { id: '9', monitorId: '1', checkedAt: '2026-11-04T11:00:00Z', outcome: 'timeout', statusCode: null, responseTimeMs: 5000, error: 'Request timed out' },
   { id: '8', monitorId: '1', checkedAt: '2026-11-04T10:00:00Z', outcome: 'connection_error', statusCode: null, responseTimeMs: 1, error: '<b>Unable to connect</b>' },
 ];
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 function select(name = 'Billing API') { fireEvent.click(screen.getByRole('button', { name: `View history for ${name}` })); }
 it('selects a monitor, focuses details, renders history in local time, and restores focus on close', async () => {
   const client = vi.fn().mockImplementation(async (url: string) => Response.json({ data: url.endsWith('limit=20') ? rows : [] }));
@@ -68,4 +68,52 @@ it('shows loading and aborts the old request when selection changes, ignoring la
   expect(await within(panel).findByText('No recorded checks for this monitor.')).toBeTruthy();
   await act(async () => { finish(Response.json({ data: rows })); });
   expect(within(panel).queryByRole('table')).toBeNull();
+});
+
+it('marks selection, scrolls and focuses once per selection, and leaves focus alone during refresh', async () => {
+  const scroll = vi.fn();
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scroll });
+  try {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => Response.json({ data: rows })));
+    const { rerender } = render(<MonitorOverview monitors={monitors} />);
+    select();
+    const card = screen.getByRole('article', { name: 'Billing API' });
+    const button = within(card).getByRole('button', { name: 'View history for Billing API' });
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(card.classList.contains('monitor-card-selected')).toBe(true);
+    expect(within(card).getByText('Selected')).toBeTruthy();
+    const panel = screen.getByRole('region', { name: 'Billing API — recent history' });
+    await within(panel).findByRole('table');
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll).toHaveBeenCalledWith({ block: 'start', behavior: 'instant' });
+    const close = within(panel).getByRole('button', { name: 'Close history' });
+    close.focus();
+    rerender(<MonitorOverview monitors={[...monitors]} refreshKey={1} />);
+    await act(async () => {});
+    expect(document.activeElement).toBe(close);
+    expect(scroll).toHaveBeenCalledTimes(1);
+    select('Search API');
+    expect(scroll).toHaveBeenCalledTimes(2);
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    expect(within(card).queryByText('Selected')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Close history' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'View history for Search API' }));
+    expect(scroll).toHaveBeenCalledTimes(2);
+  } finally {
+    if (descriptor) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', descriptor);
+    else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  }
+});
+
+it('keeps long monitor names in headings and accessible button names', async () => {
+  const name = `Customer billing production ${'VeryLongServiceName'.repeat(8)}`;
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => Response.json({ data: [] })));
+  render(<MonitorOverview monitors={[{ ...monitors[0], name }]} />);
+  const card = screen.getByRole('article', { name });
+  expect(within(card).getByRole('heading', { name }).textContent).toBe(name);
+  fireEvent.click(within(card).getByRole('button', { name: `View history for ${name}` }));
+  const panel = screen.getByRole('region', { name: `${name} — recent history` });
+  expect(await within(panel).findByText('No recorded checks for this monitor.')).toBeTruthy();
+  expect(within(panel).queryByText('No recorded checks to chart.')).toBeNull();
 });

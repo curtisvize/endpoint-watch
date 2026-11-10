@@ -17,12 +17,17 @@ export function ResultFreshness({ monitor, checkedAt }: { monitor: Monitor; chec
   const grace = freshnessGraceSeconds(monitor.intervalSeconds);
   const overdue = checkedAt !== null && Date.now() - Date.parse(checkedAt) > (monitor.intervalSeconds + grace) * 1000;
   return (
+    <div className="freshness-group">
     <p className={monitor.enabled && overdue ? 'stale-warning' : 'result-freshness'} aria-live="polite">
-      {!monitor.enabled ? 'Freshness: Paused — disabled monitors are not expected to receive checks.' :
+      {!monitor.enabled ? 'Freshness: Paused' :
         checkedAt === null ? 'Freshness: Not available — no recorded checks.' :
         overdue ? 'Freshness: Overdue — no recent result. This does not confirm endpoint failure.' :
-        'Freshness: Current — the latest known result is within the expected check window.'}
-      {monitor.enabled && checkedAt !== null && ` Expected within ${monitor.intervalSeconds} seconds plus ${grace} seconds of grace from check start.`}
+        'Freshness: Current'}
     </p>
+    {monitor.enabled && checkedAt !== null && <details className="freshness-help">
+      <summary>About freshness</summary>
+      <p>Expected within {monitor.intervalSeconds} seconds plus {grace} seconds of grace from check start. Freshness describes result age, independently of the recorded outcome.</p>
+    </details>}
+    </div>
   );
 }
