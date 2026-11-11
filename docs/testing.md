@@ -17,6 +17,12 @@ GitHub Actions runs on pull requests and pushes to `main`, using Node.js 24 and
 a disposable PostgreSQL 17 service to apply migrations, verify the schema, run
 all tests, type-check test code, and build. No deployment or release steps run.
 
+Both CI jobs select Node through the root `.nvmrc`. Native validation must use
+Node 24 too (`nvm install` and `nvm use` from the root, if using nvm). The
+[security maintenance record](security.md) documents the latest dependency/image
+validation and the remaining vulnerability findings. GitHub-hosted verification
+must still be checked after pushing these changes.
+
 ## PostgreSQL integration tests
 
 From `apps/api`, `npm test` runs database-free checks and existing API tests.

@@ -6,6 +6,17 @@ See the [quick start and smoke test](../README.md)
 for the shortest path, [API reference](api.md) for responses, and
 [troubleshooting](troubleshooting.md) for failures.
 
+## Node.js baseline
+
+Native development, Docker builds/runtime, and CI use Node.js 24 LTS. Both
+packages require `>=24 <25`; Node 20 is no longer supported. From the repository
+root, users of nvm can run `nvm install` and `nvm use` to select the version in
+`.nvmrc`. Otherwise install the latest patched Node 24 through your usual version
+manager. CI reads `.nvmrc`; Compose does not require Node on the host.
+
+See [security maintenance](security.md) for dependency updates, image refresh
+commands, and the remaining container vulnerability findings.
+
 ## Run the frontend locally
 
 The React/Vite/TypeScript frontend is in `apps/web`, with its own package
@@ -241,8 +252,8 @@ application services. It does not configure production database roles or hosting
 
 ## Run the API locally
 
-Use Node.js 24 to match the image and CI; `package.json` declares a minimum of
-Node.js 20.19. From `apps/api`:
+Use Node.js 24 to match the image and CI; `package.json` requires `>=24 <25`.
+From `apps/api`:
 
 ```bash
 npm ci
