@@ -104,6 +104,7 @@ A reused database may contain additional monitors or changed settings.
 - [API reference](docs/api.md): response formats, validation, and error behavior.
 - [Database](db/README.md): PostgreSQL setup, schema, migrations, and repository types.
 - [Testing and CI](docs/testing.md): local checks, PostgreSQL integration tests, and GitHub Actions verification.
+- [Security maintenance](docs/security.md): supported runtime, audit results, and remaining container findings.
 - [Troubleshooting](docs/troubleshooting.md): startup failures, credentials, ports, and missing history.
 - [Product specification](SPEC.md) and [architecture](docs/architecture.md): requirements and design.
 
