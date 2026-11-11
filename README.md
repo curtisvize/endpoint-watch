@@ -41,9 +41,17 @@ history retention are not implemented. Future ideas are listed in the
 
 ## Screenshots
 
-Presentation images are pending. [Screenshot capture guidance](docs/screenshots/README.md)
-reserves a location for actual dashboard and monitor-history captures; no images
-are included yet.
+### Monitoring dashboard
+
+![Endpoint Watch dashboard showing healthy, HTTP-error, and timeout monitors with their latest check results and freshness indicators.](docs/screenshots/dashboard.png)
+
+The dashboard provides an overview of monitored endpoints, including their latest known health status, response time, and check freshness. Results refresh automatically as the background worker performs scheduled checks.
+
+### Monitor history
+
+![Endpoint Watch monitor detail view showing a response-time chart, outcome history, and recent check results.](docs/screenshots/monitor-history.png)
+
+Selecting a monitor reveals its recent check history, including response-time trends, HTTP status codes, and recorded failures. This helps distinguish isolated errors from recurring issues.
 
 ## Prerequisites
 
