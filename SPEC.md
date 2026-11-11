@@ -1,13 +1,26 @@
 # Endpoint Watch - Product Specification
-**Version:** 0.1  
-**Status:** Planning
+**Version:** 0.2
+
+**Status:** MVP complete for local/private use; Milestone 4 polish implemented
 
 ## 1. Overview
 Endpoint Watch is a lightweight API health monitoring application designed for SaaS technical support and engineering teams.
 
-The application periodically checks HTTP endpoints, records their availability and response times, and provides a dashboard for quickly identifying service disrutpions and investigating failures.
+The application periodically checks HTTP endpoints, records their availability and response times, and provides a dashboard for quickly identifying service disruptions and investigating failures.
 
 The project is intended to demonstrate practical application development, API integration, automated testing, containerization, and operational troubleshooting.
+
+### Implementation status
+
+Milestones 1–3 are implemented: configured HTTP checks, PostgreSQL persistence,
+a standalone scheduled worker, read-only monitoring APIs, and the React dashboard.
+Milestone 4 adds result freshness, bounded dashboard requests and recovery,
+response-time charts with outcome markers, responsive/keyboard usability polish,
+and Node 24/dependency maintenance. Portfolio screenshots remain pending.
+
+The application is a local/private MVP, not a production monitoring service.
+Known limitations are listed below; current vulnerability findings and verification
+scope are recorded in [security maintenance](docs/security.md).
 
 ## 2. Problem Statement
 Technical support engineers often need to determine whether a reported customer issue is related to an unavailable or degraded backend service.
@@ -40,7 +53,10 @@ The application shall:
 - Allow endpoints to be enabled or disabled.
 - Use a configurable monitoring interval, with a default of 60 seconds.
 
-For the initial implementation, endpoints may be defined through application configuration rather than a UI.
+Configured monitors are stored in PostgreSQL and initially seeded with SQL.
+Enable/disable and interval changes require database updates; there is no
+monitor-management API or UI. The schema defaults to 60 seconds; local demo
+seeds use 10 seconds.
 
 ### 4.2 Health Checks
 The application shall:
@@ -73,17 +89,24 @@ The development environment shall include a mock HTTP API capable of simulating:
 - Successful responses.
 - HTTP 500 errors.
 - Delayed responses.
-- Intermittent failures.
 - Connection failures when the mock service is stopped.
 
 The mock API is intended for development and testing, not as a production monitoring target.
+Stopping/restarting it demonstrates connection failure and recovery. An automatic
+intermittent-failure endpoint is a future idea, not implemented behavior.
 
 ## 5. User Interface
-The initial dashboard will prioritize support workflows and clear presentation of service health.
+The dashboard prioritizes support workflows and clear presentation of the latest
+known outcomes. It includes monitor selection, recent history, response-time
+lines, a separate check-outcome strip, and keyboard-accessible detail navigation.
+Timeout/connection-failure durations are excluded from latency measurements.
+Freshness is calculated separately from outcome; overdue is not a failure verdict.
+Polling retains displayed data on failed refreshes and retries after bounded
+requests. Times are displayed in the user's local timezone.
 
 A future developer-focused view may expose additional technical details, including response metadata and diagnostic information.
 
-The initial implementation will not require user accounts or role-based access control.
+The local/private implementation has no user accounts or role-based access control.
 
 ## 6. Non-Functional Requirements
 ### Reliability
@@ -92,7 +115,7 @@ The initial implementation will not require user accounts or role-based access c
 - Monitoring must continue when individual endpoints are unavailable.
 
 ### Security
-- The MVP will monitor only explicitly configured or allowlisted endpoints.
+- The MVP monitors only explicitly configured or allowlisted endpoints.
 - Request timeouts must prevent indefinitely hanging checks.
 - The application must not expose secrets or sensitive configuration in API responses or logs.
 - A public deployment must not allow unrestricted requests to arbitrary URLs.
@@ -109,11 +132,13 @@ The initial implementation will not require user accounts or role-based access c
 
 ### Development Environment
 - The application must run locally without paid cloud services.
-- Docker Compose will provide a reproducible local environment.
-- GitHub Actions will run automated checks on pull requests.
+- Docker Compose provides a reproducible local environment.
+- GitHub Actions runs automated checks on pull requests and pushes to `main`.
 
 ## 7. Initial Vertical Slice (Milestone 1)
-The first implementation milestone will establish a minimal working HTTP monitoring API.
+This completed historical milestone established the stateless API. Its scope
+exclusions below applied to Milestone 1 only; later milestones added the database,
+scheduling, and frontend.
 
 ### Scope
 1. Create a Node.js/TypeScript API application.
@@ -142,14 +167,15 @@ Potential enhancements include:
 - Configurable HTTP methods, headers, and expected responses.
 - Authentication and user roles.
 - Advanced response validation.
-- Metrics and performance visualizations.
+- Aggregated metrics and advanced analytics beyond the implemented recent response-time chart.
+- Monitor-management UI/API and automatic intermittent-failure scenarios.
 - Kubernetes deployment.
 - Multi-tenant monitoring.
 
-These features are not required for the initial release and will be prioritized after the core MVP is complete
+These are uncommitted future ideas, not implemented capabilities or a delivery schedule.
 
 ## 9. MVP Completion Criteria
-The MVP is considered complete when:
+The following criteria describe the implemented MVP:
 - Configured HTTP endpoints are checked automatically on a schedule.
 - Results are persisted and available through an API.
 - A dashboard displays endpoint status and recent check history.
@@ -157,3 +183,17 @@ The MVP is considered complete when:
 - Core functionality is covered by automated tests.
 - The application can be started locally using documented Docker Compose commands.
 - The repository includes setup instructions and a basic architecture overview.
+
+## 10. Known Limitations
+
+- One worker process; overlap protection is in memory, with no distributed locking
+  or global concurrency limit. Restarting the worker resets its scheduling state.
+- No automatic retention, pagination UI, uptime aggregation, alerts, or incident detection.
+- On-demand checks use an environment-configured target and do not persist;
+  scheduled checks use database monitors and populate history.
+- Checks evaluate HTTP status and time to headers, not response bodies or custom assertions.
+- Freshness uses the browser clock and configured interval; it does not independently
+  prove worker liveness or endpoint failure.
+- Compose is for local/private use, with a shared database owner account and no
+  authentication or HTTPS configuration. Outstanding container findings remain;
+  see [security maintenance](docs/security.md).
