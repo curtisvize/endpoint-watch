@@ -1,11 +1,49 @@
 # Endpoint Watch
 
-Endpoint Watch monitors configured HTTP endpoints, records availability and
-response times in PostgreSQL, and exposes an API for recent monitoring history.
-A separate worker performs scheduled checks. The local environment includes a
-mock API for healthy, HTTP-error, and timeout scenarios. The React dashboard
-shows monitor outcomes and recent history with automatic refresh. Incident
-detection is not implemented.
+Endpoint Watch is a local HTTP monitoring dashboard for support engineers and
+developers investigating service failures. It records scheduled checks in
+PostgreSQL so users can inspect the latest known outcome and recent history.
+
+The MVP and Milestone 4 dashboard/runtime improvements are implemented. The
+application is intended for local/private use, with known security limitations
+recorded in the [security maintenance report](docs/security.md).
+
+## Features
+
+- Scheduled checks with separate healthy, HTTP-error, timeout, and connection-error outcomes.
+- Monitor overview, selectable history, local timestamps, and response-time charts with an outcome timeline.
+- Independent result-freshness indicators, automatic/manual refresh, and retained data during API failures.
+- Stateless on-demand checks against a configured target.
+- Reproducible Compose environment, SQL migrations, and Vitest/Playwright tests with GitHub Actions.
+
+**Stack:** TypeScript · Node.js 24 · Express · React/Vite · PostgreSQL/pg ·
+SVG/CSS · Docker Compose/Nginx · Vitest · Playwright.
+
+## Architecture and tradeoffs
+
+The React frontend requests `/api` through Nginx's same-origin proxy. Express
+reads monitor configuration and history from PostgreSQL. A separate Node worker
+checks enabled targets and writes results; the mock API supplies local healthy,
+HTTP-error, and delayed-response scenarios. PostgreSQL history lives in a named
+Docker volume. See the [architecture](docs/architecture.md) for component details.
+
+- **One worker:** simple interval scheduling prevents overlap per monitor within
+  one process. Multiple workers would need coordination that is deliberately deferred.
+- **Local/private deployment:** loopback-bound web/API ports keep setup small;
+  public hosting needs additional access controls and security work.
+- **Separate check paths:** scheduled checks persist to monitor history;
+  on-demand checks return a result without changing that history.
+
+Overdue results indicate missing recent observations, not confirmed endpoint
+failure. Monitor-management endpoints, alerts, incident detection, and automatic
+history retention are not implemented. Future ideas are listed in the
+[specification](SPEC.md#8-future-enhancements-out-of-mvp-scope).
+
+## Screenshots
+
+Presentation images are pending. [Screenshot capture guidance](docs/screenshots/README.md)
+reserves a location for actual dashboard and monitor-history captures; no images
+are included yet.
 
 ## Prerequisites
 
@@ -53,7 +91,7 @@ A reused database may contain additional monitors or changed settings.
    same-origin proxy, Express, and stored monitoring data. A new database may
    briefly show no recorded checks before the worker's first results arrive.
 
-3. **View history:** Tab to “View history for Mock healthy” and press Enter.
+3. **View history:** Tab to the “View history” button on the Mock healthy card and press Enter.
    Expect focus on the detail heading and recent rows showing local timestamps,
    outcomes, HTTP status codes, response times, and errors. Close history and
    expect focus to return to the selected button. This checks keyboard navigation

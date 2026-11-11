@@ -1,6 +1,7 @@
 # Endpoint Watch - Technical Architecture
-**Version:** 0.1  
-**Status:** Proposed
+**Version:** 0.2
+
+**Status:** Implemented local/private MVP with Milestone 4 polish
 
 ## 1. Architecture Overview
 Endpoint Watch is a lightweight API monitoring application built around a React frontend, Node.js backend, and PostgreSQL database.
@@ -9,11 +10,17 @@ The application follows a modular monolith architecture, with separate API and m
 
 The architecture prioritizes simplicity, testability, local reproducibility, and clear separation of responsibilities.
 
+This document describes the implemented system. Milestones 1–3 and the Milestone 4
+UI/reliability/runtime improvements are implemented; portfolio screenshots are
+pending. Future ideas and deployment limitations are separated below. See the
+[API reference](api.md) for exact response contracts and [security maintenance](security.md)
+for outstanding vulnerability findings.
+
 ## 2. Technology Stack
 | Layer | Technology |
 | ----------- | ----------- |
 | Frontend | React, TypeScript, Vite |
-| Backend | Node.js, Express, TypeScript |
+| Backend | Node.js 24 LTS, Express, TypeScript |
 | Database | PostgreSQL |
 | Database client | node-postgres (pg) |
 | HTTP client | Node.js built-in `fetch` |
@@ -34,8 +41,23 @@ Responsibilities:
 
 The frontend does not execute scheduled health checks or connect directly to the database.
 
+The overview loads one latest-history entry per monitor; a selected detail panel
+loads up to 20 entries and retains the table alongside an SVG chart. The chart
+orders points by check timestamp, joins consecutive HTTP responses, and breaks
+lines at timeouts/connection failures. An outcome strip shows every recorded
+check independently of measured response latency.
+
+Each section polls about 15 seconds after requests settle, prevents overlapping
+refreshes, retains old data on failure, and aborts obsolete requests on cleanup.
+The API client has a 10-second deadline covering headers and body reads. Failed
+refreshes show stale-data warnings separately from timestamp-based freshness.
+Freshness becomes overdue after the monitor interval plus the greater of 30 seconds
+or half the interval; a local timer updates it even when records do not change.
+Disabled monitors show paused freshness. Overdue does not confirm endpoint failure.
+
 ### 3.2 Node.js REST API
-The backend exposes HTTP endpoints for retrieving monitoring information and managing monitor configuration.
+The backend exposes read-only monitoring endpoints and a configured on-demand check.
+It provides no monitor-management endpoints.
 
 Responsibilities:
 - Handle incoming HTTP requests.
@@ -57,6 +79,14 @@ Responsibilities:
 - Continue processing when individual checks fail.
 
 The worker and API share monitoring and database modules but execute as separate processes.
+
+One process polls enabled monitors roughly once a second. A monotonic clock tracks
+last-start times; checks become due after their configured start-to-start interval.
+An in-flight map prevents overlap for the same monitor, while different monitors
+can run concurrently. Checks are not queued up for missed intervals. Errors are
+isolated and logged without raw diagnostics; subsequent polls continue.
+SIGINT/SIGTERM stop scheduling, await in-flight work, and close the database pool.
+There is no distributed lock or global concurrency limit; run one worker.
 
 ### 3.4 PostgreSQL Database
 PostgreSQL stores monitor configuration and historical check results.
@@ -82,10 +112,15 @@ The initial data model consists of two tables:
 
 The `monitor_id` column references `monitors.id`.
 
-Indexes will support efficient retrieval of recent results by monitor and timestamp.
+The recent-history index uses monitor ID, descending check timestamp, and descending
+ID for deterministic ties. Timestamps use PostgreSQL `timestamptz`. Plain SQL
+migrations run transactionally with version tracking and an advisory lock; no ORM
+is used. See the [database guide](../db/README.md) for the schema and migration commands.
 
 ### 3.5 Mock API
-A separate mock HTTP service will provide predictable test scenarios, including successful responses, HTTP errors, delays, and intermittent failures.
+A separate mock HTTP service provides fixed `/health`, `/error`, and `/delay`
+scenarios. Stopping/restarting the service demonstrates connection failure and
+recovery. Automatic intermittent failures are not implemented.
 
 The mock API is a development and testing dependency, not part of the production monitoring application.
 
@@ -104,10 +139,10 @@ For on-demand monitoring:
 1. A client requests an immediate health check.
 2. The API invokes the shared monitoring function.
 3. The result is returned as JSON.
-4. Persistence of on-demand results will be determined during implementation.
+4. The result is not persisted and does not alter scheduled monitor history.
 
 ## 5. HTTP Check Behavior
-The shared monitoring function will accept a predefined monitor target and return a structured result.
+The shared monitoring function accepts a trusted configured monitor target and returns a structured result.
 
 Each result includes:
 
@@ -118,7 +153,7 @@ Each result includes:
 - Response time in milliseconds.
 - Sanitized error information, when applicable.
 
-Initial outcome categories:
+Outcome categories:
 
 - `healthy`: HTTP 2xx response.
 - `http_error`: HTTP response outside the 2xx range.
@@ -128,7 +163,7 @@ Initial outcome categories:
 A failed check must not terminate the monitoring process.
 
 ## 6. API Design
-The initial API will expose:
+The implemented API exposes:
 
 ### GET /health
 Returns basic application health information.
@@ -136,30 +171,42 @@ Returns basic application health information.
 ### POST /api/checks/run
 Executes an on-demand check against a predefined, allowlisted endpoint and returns the result.
 
-Future endpoints may include:
+### Read-only monitor endpoints
 
-- `GET /api/monitors` - List configured monitors.
-- `GET /api/monitors/:id` - Retrieve monitor details.
-- `GET /api/monitors/:id/checks` - Retrieve historical check results.
-- `POST /api/monitors` - Create a monitor.
-- `PATCH /api/monitors/:id` - Update monitor configuration.
+- `GET /api/monitors` — all configured monitors, including disabled monitors.
+- `GET /api/monitors/:id` — one configured monitor.
+- `GET /api/monitors/:id/checks` — newest-first history; validated limit 1–1000,
+  default 20.
 
-API responses will use JSON. Error responses will follow a consistent structure.
+Read endpoints return `{ "data": ... }`. Invalid parameters, unknown monitors,
+and unexpected errors return appropriate 400, 404, and generic 500 JSON responses.
+Target URLs are omitted. Health and on-demand checks retain their original formats
+and do not require a database. No create, update, or delete endpoints are implemented.
+See [API reference](api.md) for fields and validation details.
 
 ## 7. Deployment and Local Development
-Docker Compose will provide the local development environment.
+Docker Compose provides the local development environment.
 
-The complete MVP will include:
-- Node.js API service
+The local environment includes:
+- Node.js API service.
 - Monitoring worker service.
 - PostgreSQL service.
 - Mock API service for development.
+- Built React frontend served by Nginx.
+- One-shot SQL migration and development seed service.
 
-The React frontend may run through Vite during development and be containerized for deployment.
+The frontend can run through Vite for native development. Compose serves its built
+assets through Nginx, which proxies browser `/api` requests to Express on the
+internal network. Browser code uses relative URLs, not Docker service hostnames.
+Web/API host ports bind to loopback; PostgreSQL and mock ports are not published.
+A named volume preserves database history across normal shutdowns. PostgreSQL
+readiness gates migrations; API/worker wait for migrations and mock readiness;
+web waits for API health. Worker health checks indicate process liveness, not
+proof of successful scheduled writes.
 
-Application configuration will use environment variables. Secrets and local environment files will not be committed to source control
+Application configuration uses environment variables. Secrets and local environment files are not committed to source control.
 
-The initial development environment must not require paid cloud infrastructure.
+The environment requires no paid cloud infrastructure and is not a public-deployment template.
 
 ## 8. Testing Strategy
 ### Unit Tests
@@ -175,13 +222,22 @@ Cover:
 ### Integration Tests
 Test API routes, validation, and response formats.
 
-Database integration tests wil be added when persistence is implemented.
+PostgreSQL integration tests exercise migrations, rollback, repository queries,
+scheduled persistence, and API retrieval in isolated test data. Route tests also
+use injected repositories and loopback HTTP servers, without public HTTP services.
 
 ### End-to-End Tests
-Playwright will test primary dashboard workflows after the frontend is implemented.
+Playwright tests dashboard loading, monitor selection, keyboard focus, and
+persisted history using a disposable Compose database and fixed fixtures. Its
+worker is disabled to avoid timing-dependent browser assertions. Vitest uses
+mocked network responses and controllable clocks for polling, freshness, and charts.
 
 ### CI
-GitHub Actions will execute automated test and build checks for pull requests.
+GitHub Actions runs backend and frontend test/build jobs for pull requests and
+pushes to `main`, selecting Node 24 through `.nvmrc`. Backend CI uses a PostgreSQL
+service; frontend CI includes Compose/Playwright checks. No deployment job exists.
+Local results and hosted-run verification are documented separately in
+[testing](testing.md).
 
 ## 9. Security Considerations
 - Monitor targets must be explicitly configured or allowlisted for the initial MVP.
@@ -192,7 +248,7 @@ GitHub Actions will execute automated test and build checks for pull requests.
 - The mock API must not expose unrestricted failure-control endpoints publicly.
 
 ## 10. Implementation Milestones
-### Milestone 1 - Stateless Monitoring API
+### Milestone 1 - Stateless Monitoring API (implemented)
 Implement an on-demand HTTP check using Node.js, TypeScript, and Express.
 
 Deliverables:
@@ -202,9 +258,9 @@ Deliverables:
 - Unit and integration tests.
 - Dockerized execution.
 
-No database, scheduling, or frontend is required.
+Database, scheduling, and frontend were excluded from this historical milestone.
 
-### Milestone 2 - Persistent Scheduled Monitoring
+### Milestone 2 - Persistent Scheduled Monitoring (implemented)
 Introduce PostgreSQL and a separate worker process.
 
 Deliverables:
@@ -214,7 +270,7 @@ Deliverables:
 - Persistent check results.
 - Historical results API.
 
-### Milestone 3 - Support Dashboard
+### Milestone 3 - Support Dashboard (implemented)
 Build the React frontend.
 
 Deliverables:
@@ -223,6 +279,13 @@ Deliverables:
 - Response time display.
 - Recent check history.
 - Simulated failure and recovery demonstration.
+
+### Milestone 4 - Portfolio Readiness
+
+Implemented: freshness indicators, bounded requests and recovery, SVG latency and
+outcome history, selection/responsive polish, and Node 24/dependency maintenance.
+Presentation documentation describes the completed system; screenshot assets are
+still pending in [the screenshot directory](screenshots/README.md).
 
 ## 11. Future Architectural Considerations
 Potential future improvements include:
@@ -234,18 +297,31 @@ Potential future improvements include:
 - Authentication and authorization.
 - Kubernetes deployment.
 
-These are intentionally deferred until the core monitoring application is functional.
+These are intentionally outside the implemented local MVP and are not delivery commitments.
 
-## 12. Open Questions
-- How should the worker schedule checks without overlapping executions?
-- How long should historical results be retained?
-- Should on-demand checks be persisted?
-- What level of concurrency should the monitoring worker support?
-- How should endpoint degradation be distinguished from outright failure?
+## 12. Decisions, Tradeoffs, and Known Limitations
 
+- **Single-worker scheduling:** in-process state keeps scheduling and overlap
+  protection readable. Worker restarts reset this state; multiple processes would
+  need coordination. There is no catch-up queue or global concurrency cap.
+- **Separate check paths:** scheduled checks use database monitors and persist;
+  on-demand checks use an environment target and remain stateless. They reuse the
+  same HTTP checker without coupling request handling to the scheduling loop.
+- **Local/private operation:** loopback bindings and a shared database owner simplify
+  onboarding. HTTPS, access controls, restricted on-demand load, and separate
+  application/migration database roles are prerequisites for public deployment.
+- **Bounded view, unbounded storage:** the detail panel shows recent checks, but
+  automatic retention, aggregates, and history pagination controls are absent.
+- **Observation semantics:** checks measure time to headers, not response-body
+  validity. Freshness relies on browser time and configured intervals; it does
+  not establish worker health or infer incidents.
+- **Outstanding security findings:** see [security maintenance](security.md) for
+  base-image findings, applicability notes, and the dated scan/verification record.
 
-## Milestone 1 Implementation Decisions
-The following decisions clarify the initial stateless monitoring API implementation.
+## Milestone 1 Implementation Decisions (historical)
+
+The following decisions record the initial stateless API scope. Deferrals here
+applied to Milestone 1 only; the sections above describe the completed system.
 
 ### Scope
 - Implement the Node.js/Express/TypeScript API.
