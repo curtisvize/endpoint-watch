@@ -215,3 +215,38 @@ Each card shows its latest known outcome and a separate compact freshness label.
 failed-refresh warnings remain visible without expanding help, and disabled
 monitors remain distinct from unhealthy monitors. Independent update timestamps
 remain available for the monitor list, latest checks, and selected history.
+
+## Appearance preference verification
+
+The header's **Appearance** selector supports System (default), Light, and Dark.
+The selected preference is stored under `endpoint-watch-appearance` in browser
+localStorage for the frontend origin. A different port/origin has separate
+storage. Blocked storage still permits a current-page selection; invalid saved
+values fall back to System. No server-side preference is stored.
+
+Theme validation/persistence lives in `apps/web/src/theme.ts`; the small React
+state and system-media listener live in `components/ThemeSelector.tsx`. An inline
+head script in `apps/web/index.html` applies the initial theme before React
+mounts. Keep its key/validation rules aligned with `theme.ts`; tests exercise the
+actual script. `src/styles.css` defines light semantic color variables and dark
+overrides, including chart colors and native-control `color-scheme`.
+
+To verify manually after rebuilding the web service and hard-refreshing:
+
+1. With no saved preference, confirm **System** follows the OS appearance. Tab
+   to the labeled selector and change options with the keyboard. Check visible
+   focus, native select appearance, button hover states, and reload persistence.
+2. In Chromium DevTools, open the command menu, choose **Show Rendering**, then
+   set **Emulate CSS media feature prefers-color-scheme** to `dark` and `light`.
+   System should change immediately. Explicit Light/Dark must ignore these
+   changes; selecting System again should follow the currently emulated scheme.
+3. Inspect selected cards, healthy/error badges, overdue/stale warnings, table,
+   chart legend/markers/lines, and controls in both themes. Narrow the viewport
+   to 320/375 pixels and confirm there is no page-wide overflow.
+4. Use DevTools' Application → Local Storage to remove the preference (reset to
+   System on reload) or set it to an invalid value (also System on reload).
+   Storage is local to this browser/origin; other open tabs are not synchronized.
+
+Vitest covers the initial head script, System changes, explicit preferences,
+persistence, invalid/blocked storage, and listener cleanup. These are frontend
+checks; the backend and API contracts are unaffected.

@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Endpoint Watch API monitoring dashboard." />
     <title>Endpoint Watch</title>
+    <script>
+      // Keep this small pre-render bootstrap aligned with src/theme.ts.
+      (() => {
+        let preference = 'system';
+        try {
+          const saved = localStorage.getItem('endpoint-watch-appearance');
+          if (saved === 'light' || saved === 'dark' || saved === 'system') preference = saved;
+        } catch {}
+        const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+        document.documentElement.dataset.theme = preference === 'system' ? (dark ? 'dark' : 'light') : preference;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

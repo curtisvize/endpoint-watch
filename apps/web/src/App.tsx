@@ -3,6 +3,7 @@ import { listMonitors } from './api/monitors';
 import { MonitorOverview } from './components/MonitorOverview';
 import { RefreshNotice } from './components/RefreshNotice';
 import { usePolling } from './hooks/usePolling';
+import { ThemeSelector } from './components/ThemeSelector';
 
 export function App() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -12,6 +13,7 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
+        <div className="header-appearance"><ThemeSelector /></div>
         <p className="eyebrow">API monitoring</p>
         <h1>Endpoint Watch</h1>
         <p>A clear view of your services, all in one place.</p>
